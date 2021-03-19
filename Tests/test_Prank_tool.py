@@ -184,8 +184,8 @@ class PrankConversion(unittest.TestCase):
         self.assertEqual(str(eval(repr(cmdline))), str(cmdline))
         message, error = cmdline()
         self.assertIn("PRANK", message)
-        self.assertTrue(
-            ("converting '%s' to '%s'" % (self.input, filename)) in message, message
+        self.assertIn(
+            ("converting '%s' to '%s'" % (self.input, filename)), message, message
         )
         self.assertEqual(error, "")
         self.assertTrue(os.path.isfile(filename))
@@ -198,7 +198,7 @@ class PrankConversion(unittest.TestCase):
         self.assertEqual(len(old), len(new))
         for old_r, new_r in zip(old, new):
             self.assertEqual(old_r.id, new_r.id)
-            self.assertEqual(str(old_r.seq), str(new_r.seq))
+            self.assertEqual(old_r.seq, new_r.seq)
         os.remove(filename)
 
     def test_convert_to_fasta(self):

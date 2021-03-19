@@ -6,7 +6,7 @@
 # choice of the "Biopython License Agreement" or the "BSD 3-Clause License".
 # Please see the LICENSE file that should have been included as part of this
 # package.
-"""Definitions for interacting with BLAST related applications.
+"""Definitions for interacting with BLAST related applications (OBSOLETE).
 
 Wrappers for the new NCBI BLAST+ tools (written in C++):
 
@@ -27,6 +27,9 @@ For further details, see:
 Camacho et al. BLAST+: architecture and applications
 BMC Bioinformatics 2009, 10:421
 https://doi.org/10.1186/1471-2105-10-421
+
+We have decided to remove this module in future, and instead recommend
+building your command and invoking it via the subprocess module directly.
 """
 
 from Bio.Application import _Option, AbstractCommandline, _Switch
@@ -1452,6 +1455,14 @@ class NcbimakeblastdbCommandline(AbstractCommandline):
                 equate=False,
             ),
             # makeblastdb specific options
+            _Option(
+                ["-blastdb_version", "blastdb_version"],
+                "Version of BLAST database to be created. "
+                "Tip: use BLAST database version 4 on 32 bit CPU. "
+                "Default = 5",
+                equate=False,
+                checker_function=lambda x: x == 4 or x == 5,
+            ),
             _Option(
                 ["-dbtype", "dbtype"],
                 "Molecule type of target db ('nucl' or 'prot').",

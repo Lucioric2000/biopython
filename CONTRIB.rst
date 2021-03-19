@@ -130,9 +130,11 @@ please open an issue on GitHub or mention it on the mailing list.
 - Jacek Śmietański <https://github.com/dadoskawina>
 - Jack Twilley <https://github.com/mathuin>
 - Jakub Lipinski <https://github.com/jakublipinski>
+- James Baker <https://github.com/JamesABaker>
 - James Casbon <https://github.com/jamescasbon>
 - James Jeffryes <https://github.com/JamesJeffryes>
 - Jared Andrews <https://github.com/j-andrews7>
+- Jared Lumpe <https://github.com/jlumpe>
 - Jason A. Hackney <jhackney at domain stanford.edu>
 - Jeff Hussmann <first dot last at gmail dot com>
 - Jeffrey Chang <https://github.com/jchang>
@@ -185,6 +187,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Leszek Pryszcz <https://github.com/lpryszcz>
 - Lewis A. Marshall <https://github.com/lewisamarshall>
 - Lucas Sinclair <https://github.com/xapple>
+- Lukasz Walejko <https://github.com/lwalejko>
 - Manuel Nuno Melo <https://github.com/mnmelo>
 - Marc Colosimo <mcolosimo at domain mitre.org>
 - Marcin Magnus <https://github.com/mmagnus>
@@ -222,6 +225,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Noam Kremen <https://github.com/noamkremen>
 - Olivier Morelle <https://github.com/Oli4>
 - Oscar G. Garcia <https://github.com/oscarmaestre>
+- Osvaldo Zagordi <https://github.com/ozagordi>
 - Owen Solberg <https://github.com/odoublewen>
 - Pamela Russell <https://github.com/pamelarussell>
 - Patrick Kunzmann <https://github.com/padix-key>
@@ -231,6 +235,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Peter Kerpedjiev <https://github.com/pkerpedjiev>
 - Peter Slickers <piet at domain clondiag.com>
 - Philip Bergstrom <https://github.com/phber>
+- Philip Capel <https://github.com/pcapel>
 - Phillip Garland <pgarland at gmail>
 - Ralf Stephan <https://github.com/rwst>
 - Rasmus Fonseca <https://github.com/RasmusFonseca>
@@ -247,6 +252,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Sergei Lebedev <https://github.com/superbobry>
 - Sergio Valqui <https://github.com/svalqui>
 - Seth Sims <seth.sims at gmail>
+- Shoichiro Kawauchi <https://github.com/lacrosse91>
 - Shuichiro MAKIGAKI <https://github.com/shuichiro-makigaki>
 - Shyam Saladi <https://github.com/smsaladi>
 - Siong Kong <https://github.com/siongkong>
@@ -260,6 +266,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Sujan Dulal <https://github.com/Dsujan>
 - Sunhwan Jo <https://github.com/sunhwan>
 - Suresh Panneerselvam <https://github.com/Amrithasuresh>
+- Suyash Gupta <https://github.com/sgalpha01>
 - Tarcisio Fedrizzi <https://github.com/hcraT>
 - Tarjei Mikkelsen <https://github.com/tmikkelsen>
 - Ted Cybulski <https://github.com/tcyb>
@@ -276,6 +283,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Uwe Schmitt <https://github.com/uweschmitt>
 - Veronika Berman <https://github.com/NikiB>
 - Victor Lin <https://github.com/victorlin>
+- Vini Salazar <https://github.com/vinisalazar>
 - Walter Gillett <https://github.com/wgillett>
 - Wayne Decatur <https://github.com/fomightez>
 - Wibowo Arindrarto <https://github.com/bow>

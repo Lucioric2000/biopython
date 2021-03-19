@@ -13,13 +13,9 @@ class, used in the Bio.AlignIO module.
 
 """
 
-
-import warnings
-
-from Bio import BiopythonDeprecationWarning
 from Bio.Align import _aligners
 from Bio.Align import substitution_matrices
-from Bio.Seq import Seq
+from Bio.Seq import Seq, MutableSeq
 from Bio.SeqRecord import SeqRecord, _RestrictedDict
 
 # Import errors may occur here if a compiled aligners.c file
@@ -294,20 +290,6 @@ class MultipleSeqAlignment:
         # but it can be VERY long:
         # return "%s(%r)" \
         #       % (self.__class__, self._records)
-
-    def format(self, format_spec):
-        """Return the alignment as a string in the specified file format [DEPRECATED].
-
-        This method is deprecated; instead of alignment.format(format_spec),
-        please use format(alignment, format_spec) or an f-string.
-        """
-        warnings.warn(
-            "alignment.format has been deprecated, and we intend to remove it in a "
-            "future release of Biopython. Instead of alignment.format(format_spec), "
-            "please use format(alignment, format_spec) or an f-string.",
-            BiopythonDeprecationWarning,
-        )
-        return self.__format__(format_spec)
 
     def __format__(self, format_spec):
         """Return the alignment as a string in the specified file format.
@@ -821,7 +803,7 @@ class MultipleSeqAlignment:
         else:
             # e.g. sub_align = align[1:4, 5:7], gives another alignment
             new = MultipleSeqAlignment(
-                (rec[col_index] for rec in self._records[row_index])
+                rec[col_index] for rec in self._records[row_index]
             )
             if self.column_annotations and len(new) == len(self):
                 # All rows kept (although could have been reversed)
@@ -1029,6 +1011,8 @@ class PairwiseAlignment:
         return self.path >= other.path
 
     def _convert_sequence_string(self, sequence):
+        if isinstance(sequence, (bytes, bytearray)):
+            return sequence.decode()
         if isinstance(sequence, str):
             return sequence
         if isinstance(sequence, Seq):
@@ -1267,20 +1251,6 @@ class PairwiseAlignment:
         ]
         line = "\t".join(words) + "\n"
         return line
-
-    def format(self):
-        """Create a human-readable representation of the alignment (DEPRECATED).
-
-        This method is deprecated; instead of alignment.format(), please use
-        format(alignment) or an f-string.
-        """
-        warnings.warn(
-            "alignment.format has been deprecated, and we intend to remove it in a "
-            "future release of Biopython. Instead of alignment.format(), please use "
-            "format(alignment) or an f-string.",
-            BiopythonDeprecationWarning,
-        )
-        return self.__format__(None)
 
     def __str__(self):
         return self.__format__(None)
@@ -1585,21 +1555,69 @@ class PairwiseAligner(_aligners.PairwiseAligner):
 
     def align(self, seqA, seqB):
         """Return the alignments of two sequences using PairwiseAligner."""
-        if isinstance(seqA, Seq):
-            seqA = str(seqA)
-        if isinstance(seqB, Seq):
-            seqB = str(seqB)
+        if isinstance(seqA, (Seq, MutableSeq)):
+            seqA = bytes(seqA)
+        if isinstance(seqB, (Seq, MutableSeq)):
+            seqB = bytes(seqB)
         score, paths = _aligners.PairwiseAligner.align(self, seqA, seqB)
         alignments = PairwiseAlignments(seqA, seqB, score, paths)
         return alignments
 
     def score(self, seqA, seqB):
         """Return the alignments score of two sequences using PairwiseAligner."""
-        if isinstance(seqA, Seq):
-            seqA = str(seqA)
-        if isinstance(seqB, Seq):
-            seqB = str(seqB)
+        if isinstance(seqA, (Seq, MutableSeq)):
+            seqA = bytes(seqA)
+        if isinstance(seqB, (Seq, MutableSeq)):
+            seqB = bytes(seqB)
         return _aligners.PairwiseAligner.score(self, seqA, seqB)
+
+    def __getstate__(self):
+        state = {
+            "wildcard": self.wildcard,
+            "target_internal_open_gap_score": self.target_internal_open_gap_score,
+            "target_internal_extend_gap_score": self.target_internal_extend_gap_score,
+            "target_left_open_gap_score": self.target_left_open_gap_score,
+            "target_left_extend_gap_score": self.target_left_extend_gap_score,
+            "target_right_open_gap_score": self.target_right_open_gap_score,
+            "target_right_extend_gap_score": self.target_right_extend_gap_score,
+            "query_internal_open_gap_score": self.query_internal_open_gap_score,
+            "query_internal_extend_gap_score": self.query_internal_extend_gap_score,
+            "query_left_open_gap_score": self.query_left_open_gap_score,
+            "query_left_extend_gap_score": self.query_left_extend_gap_score,
+            "query_right_open_gap_score": self.query_right_open_gap_score,
+            "query_right_extend_gap_score": self.query_right_extend_gap_score,
+            "mode": self.mode,
+        }
+        if self.substitution_matrix is None:
+            state["match_score"] = self.match_score
+            state["mismatch_score"] = self.mismatch_score
+        else:
+            state["substitution_matrix"] = self.substitution_matrix
+        return state
+
+    def __setstate__(self, state):
+        self.wildcard = state["wildcard"]
+        self.target_internal_open_gap_score = state["target_internal_open_gap_score"]
+        self.target_internal_extend_gap_score = state[
+            "target_internal_extend_gap_score"
+        ]
+        self.target_left_open_gap_score = state["target_left_open_gap_score"]
+        self.target_left_extend_gap_score = state["target_left_extend_gap_score"]
+        self.target_right_open_gap_score = state["target_right_open_gap_score"]
+        self.target_right_extend_gap_score = state["target_right_extend_gap_score"]
+        self.query_internal_open_gap_score = state["query_internal_open_gap_score"]
+        self.query_internal_extend_gap_score = state["query_internal_extend_gap_score"]
+        self.query_left_open_gap_score = state["query_left_open_gap_score"]
+        self.query_left_extend_gap_score = state["query_left_extend_gap_score"]
+        self.query_right_open_gap_score = state["query_right_open_gap_score"]
+        self.query_right_extend_gap_score = state["query_right_extend_gap_score"]
+        self.mode = state["mode"]
+        substitution_matrix = state.get("substitution_matrix")
+        if substitution_matrix is None:
+            self.match_score = state["match_score"]
+            self.mismatch_score = state["mismatch_score"]
+        else:
+            self.substitution_matrix = substitution_matrix
 
 
 if __name__ == "__main__":

@@ -75,9 +75,7 @@ class TestPhenoMicro(unittest.TestCase):
             # I want to see the output when called from the test harness,
             # run_tests.py (which can be funny about new lines on Windows)
             handle.seek(0)
-            raise ValueError(
-                "%s\n\n%r\n\n%r" % (str(e), handle.read(), records)
-            ) from None
+            self.fail("%s\n\n%r\n\n%r" % (e, handle.read(), records))
 
         self.assertEqual(p1, records[0])
 
@@ -132,8 +130,8 @@ class TestPhenoMicro(unittest.TestCase):
         p["A02"] = p["A02"]
         for w in p:
             pass
-        self.assertEqual("A01" in p, True)
-        self.assertEqual("test" in p, False)
+        self.assertIn("A01", p)
+        self.assertNotIn("test", p)
         self.assertRaises(ValueError, next, p.get_row("test"))
         self.assertEqual(next(p.get_row("A")), p["A01"])
         self.assertRaises(ValueError, next, p.get_column("test"))
@@ -256,13 +254,13 @@ class TestPhenoMicro(unittest.TestCase):
         )
 
         w.fit(None)
-        self.assertEqual(w.area, None)
-        self.assertEqual(w.model, None)
-        self.assertEqual(w.lag, None)
-        self.assertEqual(w.plateau, None)
-        self.assertEqual(w.slope, None)
-        self.assertEqual(w.v, None)
-        self.assertEqual(w.y0, None)
+        self.assertIsNone(w.area)
+        self.assertIsNone(w.model)
+        self.assertIsNone(w.lag)
+        self.assertIsNone(w.plateau)
+        self.assertIsNone(w.slope)
+        self.assertIsNone(w.v)
+        self.assertIsNone(w.y0)
         self.assertEqual(w.max, 313.0)
         self.assertEqual(w.min, 29.0)
         self.assertEqual(w.average_height, 217.82552083333334)

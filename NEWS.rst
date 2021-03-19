@@ -8,8 +8,128 @@ https://www.open-bio.org/category/obf-projects/biopython/
 
 The latest news is at the top of this file.
 
-(In progress, not yet released): Biopython 1.78
+(In progress, not yet released): Biopython 1.79
 ===============================================
+
+This is intended to be our final release supporting Python 3.6. It also
+supports Python 3.7, 3.8 and 3.9, and has also been tested on PyPy3.6.1 v7.1.1.
+
+The ``Seq`` and ``MutableSeq`` classes in ``Bio.Seq`` now store their sequence
+contents as ``bytes` ` and ``bytearray`` objects, respectively. Previously, for
+``Seq`` objects a string object was used, and a Unicode array object for
+``MutableSeq`` objects. This was maintained during the transition from Python2
+to Python3. However, a Python2 string object corresponds to a ``bytes`` object
+in Python3, storing the string as a series of 256-bit characters. While non-
+ASCII characters could be stored in Python2 strings, they were not treated as
+such. For example:
+
+In Python2::
+
+    >>> s = "Генетика"
+    >>> type(s)
+    <class 'str'>
+    >>> len(s)
+    16
+
+In Python3::
+
+    >>> s = "Генетика"
+    >>> type(s)
+    <class 'str'>
+    >>> len(s)
+    8
+
+In Python3, storing the sequence contents as ``bytes`` and ``bytearray``
+objects has the further advantage that both support the buffer protocol.
+
+Taking advantage of the similarity between ``bytes`` and ``bytearray``, the
+``Seq`` and ``MutableSeq`` classes now inherit from an abstract base class
+``_SeqAbstractBaseClass`` in ``Bio.Seq`` that implements most of the ``Seq``
+and ``MutableSeq`` methods, ensuring their consistency with each other. For
+methods that modify the sequence contents, an optional ``inplace`` argument to
+specify if a new sequence object should be returned with the new sequence
+contents (if ``inplace`` is ``False``, the default) or if the sequence object
+itself should be modified (if ``inplace`` is ``True``). For ``Seq`` objects,
+which are immutable, using ``inplace=True`` raises an exception. For
+``inplace=False``, the default, ``Seq`` objects and ``MutableSeq`` behave
+consistently.
+
+As before, ``Seq`` and ``MutableSeq`` objects can be initialized using a string
+object, which will be converted to a ``bytes`` or ``bytearray`` object assuming
+an ASCII encoding. Alternatively, a ``bytes`` or ``bytearray`` object can be
+used, or an instance of any class inheriting from the new
+``SequenceDataAbstractBaseClass`` abstract base class in ``Bio.Seq``. This
+requires that the class implements the ``__len__`` and ``__getitem`` methods
+that return the sequence length and sequence contents on demand. Initialzing a
+``Seq`` instance using an instance of a class inheriting from
+``SequenceDataAbstractBaseClass`` allows the ``Seq`` object to be lazy, meaning
+that its sequence is provided on demand only, without requiring to initialize
+the full sequence. This feature is now used in ``BioSQL``, providing on-demand
+sequence loading from an SQL database, as well as in a new parser for twoBit
+(.2bit) sequence data added to ``Bio.SeqIO``. This is a lazy parser that allows
+fast access to genome-size DNA sequence files by not having to read the full
+genome sequence. The new ``_UndefinedSequenceData`` class in ``Bio.Seq``  also
+inherits from ``SequenceDataAbstractBaseClass`` to represent sequences of known
+length but unknown sequence contents. This provides an alternative to
+``UnknownSeq``, which is now deprecated as its definition was ambiguous. For
+example, in these examples the ``UnknownSeq`` is interpreted as a sequence with
+a well-defined sequence contents::
+
+    >>> s = UnknownSeq(3, character="A")
+    >>> s.translate()
+    UnknownSeq(1, character='K')
+    >>> s + "A"
+    Seq("AAAA")
+
+A sequence object with an undefined sequence contents can now be created by
+using ``None`` when creating the ``Seq`` object, together with the sequence
+length. Trying to access its sequence contents raises an
+``UndefinedSequenceError``::
+
+    >>> s = Seq(None, length=6)
+    >>> s
+    Seq(None, length=6)
+    >>> len(s)
+    6
+    >>> "A" in s
+    Traceback (most recent call last):
+    ...
+    Bio.Seq.UndefinedSequenceError: Sequence content is undefined
+    >>> print(s)
+    Traceback (most recent call last):
+    ....
+    Bio.Seq.UndefinedSequenceError: Sequence content is undefined
+
+Element assignment in Bio.PDB.Atom now returns "X" when the element cannot be
+unambiguously guessed from the atom name, in accordance with PDB structures.
+
+Bio.PDB entities now have a ``center_of_mass()`` method that calculates either
+centers of gravity or geometry.
+
+New method ``disordered_remove()`` implemented in Bio.PDB DisorderedAtom and
+DisorderedResidue to remove children.
+
+New module Bio.PDB.SASA implements the Shrake-Rupley algorithm to calculate
+atomic solvent accessible areas without third-party tools.
+
+Expected ``TypeError`` behaviour has been restored to the ``Seq`` object's
+string like methods (fixing a regression in Biopython 1.78).
+
+The KEGG ``KGML_Pathway`` KGML output was fixed to produce output that complies
+with KGML v0.7.2.
+
+Many thanks to the Biopython developers and community for making this release
+possible, especially the following contributors:
+
+- Damien Goutte-Gattat
+- João Rodrigues
+- Markus Piotrowski
+- Suyash Gupta
+- Vini Salazar (first contribution)
+- Leighton Pritchard
+
+4 September 2020: Biopython 1.78
+================================
 
 This release of Biopython supports Python 3.6, 3.7 and 3.8. It has also been
 tested on PyPy3.6.1 v7.1.1.
@@ -18,10 +138,13 @@ The main change is that ``Bio.Alphabet`` is no longer used. In some cases you
 will now have to specify expected letters, molecule type (DNA, RNA, protein),
 or gap character explicitly. Please consult the updated Tutorial and API
 documentation for guidance. This simplification has sped up many ``Seq``
-object methods.
+object methods. See https://biopython.org/wiki/Alphabet for more information.
 
 ``Bio.SeqIO.parse()`` is faster with "fastq" format due to small improvements
 in the ``Bio.SeqIO.QualityIO`` module.
+
+The ``SeqFeature`` object's ``.extract()`` method can now be used for
+trans-spliced locations via an optional dictionary of references.
 
 As in recent releases, more of our code is now explicitly available under
 either our original "Biopython License Agreement", or the very similar but
@@ -36,6 +159,7 @@ been reformatted with the ``black`` tool to match the main code base.
 Many thanks to the Biopython developers and community for making this release
 possible, especially the following contributors:
 
+- Adam Sjøgren (first contribution)
 - Carlos Pena
 - Chris Daley
 - Chris Rands
@@ -44,6 +168,7 @@ possible, especially the following contributors:
 - João Rodrigues
 - João Vitor F Cavalcante (first contribution)
 - Marie Crane
+- Markus Piotrowski
 - Michiel de Hoon
 - Peter Cock
 - Sergio Valqui
@@ -241,6 +366,7 @@ possible, especially the following contributors:
 - Mike Moritz (first contribution)
 - Mustafa Anil Tuncel
 - Nick Negretti
+- Osvaldo Zagordi (first contribution)
 - Peter Cock
 - Peter Kerpedjiev
 - Sergio Valqui

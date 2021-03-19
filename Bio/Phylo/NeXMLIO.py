@@ -2,9 +2,11 @@
 # Based on Bio.Nexus, copyright 2005-2008 by Frank Kauff & Cymon J. Cox
 # and Bio.Phylo.Newick, copyright 2009 by Eric Talevich.
 # All rights reserved.
-# This code is part of the Biopython distribution and governed by its
-# license. Please see the LICENSE file that should have been included
-# as part of this package.
+#
+# This file is part of the Biopython distribution and governed by your
+# choice of the "Biopython License Agreement" or the "BSD 3-Clause License".
+# Please see the LICENSE file that should have been included as part of this
+# package.
 
 """I/O function wrappers for the NeXML file format.
 
@@ -284,7 +286,12 @@ class Writer:
         # use xml.dom.minodom for pretty printing
         rough_string = ElementTree.tostring(root_node, "utf-8")
         reparsed = minidom.parseString(rough_string)
-        handle.write(reparsed.toprettyxml(indent="  ").encode("utf8"))
+        try:
+            # XML handles ought to be in binary mode
+            handle.write(reparsed.toprettyxml(indent="  ").encode("utf8"))
+        except TypeError:
+            # Fall back for text mode
+            handle.write(reparsed.toprettyxml(indent="  "))
 
         return count
 

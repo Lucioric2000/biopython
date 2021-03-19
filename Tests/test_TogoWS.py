@@ -577,11 +577,8 @@ class TogoSearch(unittest.TestCase):
             search_count = TogoWS.search_count(database, search_term)
         except HTTPError as err:
             raise ValueError("%s from %s" % (err, err.url)) from None
-        if expected_matches and search_count < len(expected_matches):
-            raise ValueError(
-                "Only %i matches, expected at least %i"
-                % (search_count, len(expected_matches))
-            )
+        if expected_matches:
+            self.assertGreaterEqual(search_count, len(expected_matches))
         if search_count > 5000 and not limit:
             print("%i results, skipping" % search_count)
             return
@@ -594,9 +591,7 @@ class TogoSearch(unittest.TestCase):
         search_iter = list(TogoWS.search_iter(database, search_term, limit))
         self.assertEqual(count, len(search_iter))
         for match in expected_matches:
-            self.assertTrue(
-                match in search_iter, "Expected %s in results but not" % match
-            )
+            self.assertIn(match, search_iter, "Expected %s in results" % match)
 
 
 class TogoConvert(unittest.TestCase):
@@ -625,7 +620,7 @@ class TogoConvert(unittest.TestCase):
         old = SeqIO.read(filename, "gb")
         with open(filename) as handle:
             new = SeqIO.read(TogoWS.convert(handle, "genbank", "fasta"), "fasta")
-        self.assertEqual(str(old.seq), str(new.seq))
+        self.assertEqual(old.seq, new.seq)
 
 
 #    def test_genbank_to_embl(self):

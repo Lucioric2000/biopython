@@ -4,7 +4,6 @@
 # choice of the "Biopython License Agreement" or the "BSD 3-Clause License".
 # Please see the LICENSE file that should have been included as part of this
 # package.
-
 """Multiple sequence alignment input/output as alignment objects.
 
 The Bio.AlignIO interface is deliberately very similar to Bio.SeqIO, and in
@@ -126,8 +125,6 @@ You can also use any file format supported by Bio.SeqIO, such as "fasta" or
 "ig" (which are listed above), PROVIDED the sequences in your file are all the
 same length.
 """
-
-
 # TODO
 # - define policy on reading aligned sequences with gaps in
 #   (e.g. - and . characters)
@@ -141,19 +138,18 @@ same length.
 #
 # - MSF multiple alignment format, aka GCG, aka PileUp format (*.msf)
 #   http://www.bioperl.org/wiki/MSF_multiple_alignment_format
-
 from Bio.Align import MultipleSeqAlignment
 from Bio.File import as_handle
 
-from . import StockholmIO
 from . import ClustalIO
-from . import NexusIO
-from . import PhylipIO
 from . import EmbossIO
 from . import FastaIO
 from . import MafIO
 from . import MauveIO
 from . import MsfIO
+from . import NexusIO
+from . import PhylipIO
+from . import StockholmIO
 
 # Convention for format names is "mainname-subtype" in lower case.
 # Please use the same names as BioPerl and EMBOSS where possible.
@@ -418,6 +414,35 @@ def convert(in_file, in_format, out_file, out_format, molecule_type=None):
     **NOTE** - If you provide an output filename, it will be opened which will
     overwrite any existing file without warning. This may happen if even the
     conversion is aborted (e.g. an invalid out_format name is given).
+
+    Some output formats require the molecule type be specified where this
+    cannot be determined by the parser. For example, converting to FASTA,
+    Clustal, or PHYLIP format to NEXUS:
+
+    >>> from io import StringIO
+    >>> from Bio import AlignIO
+    >>> handle = StringIO()
+    >>> AlignIO.convert("Phylip/horses.phy", "phylip", handle, "nexus", "DNA")
+    1
+    >>> print(handle.getvalue())
+    #NEXUS
+    begin data;
+    dimensions ntax=10 nchar=40;
+    format datatype=dna missing=? gap=-;
+    matrix
+    Mesohippus   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    Hypohippus   AAACCCCCCCAAAAAAAAACAAAAAAAAAAAAAAAAAAAA
+    Archaeohip   CAAAAAAAAAAAAAAAACACAAAAAAAAAAAAAAAAAAAA
+    Parahippus   CAAACAACAACAAAAAAAACAAAAAAAAAAAAAAAAAAAA
+    Merychippu   CCAACCACCACCCCACACCCAAAAAAAAAAAAAAAAAAAA
+    'M. secundu' CCAACCACCACCCACACCCCAAAAAAAAAAAAAAAAAAAA
+    Nannipus     CCAACCACAACCCCACACCCAAAAAAAAAAAAAAAAAAAA
+    Neohippari   CCAACCCCCCCCCCACACCCAAAAAAAAAAAAAAAAAAAA
+    Calippus     CCAACCACAACCCACACCCCAAAAAAAAAAAAAAAAAAAA
+    Pliohippus   CCCACCCCCCCCCACACCCCAAAAAAAAAAAAAAAAAAAA
+    ;
+    end;
+    <BLANKLINE>
     """
     if molecule_type:
         if not isinstance(molecule_type, str):

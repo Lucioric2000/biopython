@@ -1,7 +1,9 @@
 # Copyright (C) 2009 by Eric Talevich (eric.talevich@gmail.com)
-# This code is part of the Biopython distribution and governed by its
-# license. Please see the LICENSE file that should have been included
-# as part of this package.
+#
+# This file is part of the Biopython distribution and governed by your
+# choice of the "Biopython License Agreement" or the "BSD 3-Clause License".
+# Please see the LICENSE file that should have been included as part of this
+# package.
 
 """PhyloXML reader/parser, writer, and associated functions.
 
@@ -665,7 +667,7 @@ class Parser:
 
 
 def _serialize(value):
-    """Convert a Python primitive to a phyloXML-compatible Unicode string (PRIVATE)."""
+    """Convert a Python primitive to a phyloXML-compatible string (PRIVATE)."""
     if isinstance(value, float):
         return str(value).upper()
     elif isinstance(value, bool):

@@ -9,7 +9,7 @@
 # Please see the LICENSE file that should have been included as part of this
 # package.
 
-"""Unit tests for the Bio.PDB.Polypetide module."""
+"""Unit tests for the Bio.PDB.Polypeptide module."""
 
 import unittest
 
@@ -18,7 +18,7 @@ from Bio.Seq import Seq
 
 
 class PolypeptideTests(unittest.TestCase):
-    """Test Polypetide module."""
+    """Test Polypeptide module."""
 
     @classmethod
     def setUpClass(self):
@@ -46,9 +46,9 @@ class PolypeptideTests(unittest.TestCase):
         pp1_seq = pp[1].get_sequence()
         pp2_seq = pp[2].get_sequence()
         self.assertIsInstance(pp0_seq, Seq)
-        self.assertEqual(str(pp0_seq), "DIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNW")
-        self.assertEqual(str(pp1_seq), "TETLLVQNANPDCKTILKALGPGATLEE")
-        self.assertEqual(str(pp2_seq), "TACQG")
+        self.assertEqual(pp0_seq, "DIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNW")
+        self.assertEqual(pp1_seq, "TETLLVQNANPDCKTILKALGPGATLEE")
+        self.assertEqual(pp2_seq, "TACQG")
 
     def test_ppbuilder_real_nonstd(self):
         """Test PPBuilder on real PDB file allowing non-standard amino acids."""
@@ -66,8 +66,7 @@ class PolypeptideTests(unittest.TestCase):
         self.assertIsInstance(s, Seq)
         # Here non-standard MSE are shown as M
         self.assertEqual(
-            "MDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPGATLEEMMTACQG",
-            str(s),
+            "MDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPGATLEEMMTACQG", s,
         )
 
     def test_ppbuilder_torsion(self):
@@ -76,7 +75,7 @@ class PolypeptideTests(unittest.TestCase):
         pp = ppb.build_peptides(self.structure)
 
         phi_psi = pp[0].get_phi_psi_list()
-        self.assertEqual(phi_psi[0][0], None)
+        self.assertIsNone(phi_psi[0][0])
         self.assertAlmostEqual(phi_psi[0][1], -0.46297171497725553, places=3)
         self.assertAlmostEqual(phi_psi[1][0], -1.0873937604007962, places=3)
         self.assertAlmostEqual(phi_psi[1][1], 2.1337707832637109, places=3)
@@ -84,7 +83,7 @@ class PolypeptideTests(unittest.TestCase):
         self.assertAlmostEqual(phi_psi[2][1], 2.3807316946081554, places=3)
 
         phi_psi = pp[1].get_phi_psi_list()
-        self.assertEqual(phi_psi[0][0], None)
+        self.assertIsNone(phi_psi[0][0])
         self.assertAlmostEqual(phi_psi[0][1], -0.6810077089092923, places=3)
         self.assertAlmostEqual(phi_psi[1][0], -1.2654003477656888, places=3)
         self.assertAlmostEqual(phi_psi[1][1], -0.58689987042756309, places=3)
@@ -92,7 +91,7 @@ class PolypeptideTests(unittest.TestCase):
         self.assertAlmostEqual(phi_psi[2][1], -1.5655066256698336, places=3)
 
         phi_psi = pp[2].get_phi_psi_list()
-        self.assertEqual(phi_psi[0][0], None)
+        self.assertIsNone(phi_psi[0][0])
         self.assertAlmostEqual(phi_psi[0][1], -0.73222884210889716, places=3)
         self.assertAlmostEqual(phi_psi[1][0], -1.1044740234566259, places=3)
         self.assertAlmostEqual(phi_psi[1][1], -0.69681334592782884, places=3)
@@ -107,9 +106,9 @@ class PolypeptideTests(unittest.TestCase):
         pp0_seq = pp[0].get_sequence()
         pp1_seq = pp[1].get_sequence()
         pp2_seq = pp[2].get_sequence()
-        self.assertEqual(str(pp0_seq), "DIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNW")
-        self.assertEqual(str(pp1_seq), "TETLLVQNANPDCKTILKALGPGATLEE")
-        self.assertEqual(str(pp2_seq), "TACQG")
+        self.assertEqual(pp0_seq, "DIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNW")
+        self.assertEqual(pp1_seq, "TETLLVQNANPDCKTILKALGPGATLEE")
+        self.assertEqual(pp2_seq, "TACQG")
         self.assertEqual(
             [ca.serial_number for ca in pp[0].get_ca_list()],
             [
@@ -165,8 +164,7 @@ class PolypeptideTests(unittest.TestCase):
         self.assertIsInstance(s, Seq)
         # Here non-standard MSE are shown as M
         self.assertEqual(
-            "MDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPGATLEEMMTACQG",
-            str(s),
+            "MDIRQGPKEPFRDYVDRFYKTLRAEQASQEVKNWMTETLLVQNANPDCKTILKALGPGATLEEMMTACQG", s,
         )
 
     def test_cappbuilder_tau(self):

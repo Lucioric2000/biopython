@@ -4,21 +4,21 @@
 # choice of the "Biopython License Agreement" or the "BSD 3-Clause License".
 # Please see the LICENSE file that should have been included as part of this
 # package.
-
 """Bio.SeqIO support for the SnapGene file format.
 
 The SnapGene binary format is the native format used by the SnapGene program
 from GSL Biotech LLC.
 """
-
 from datetime import datetime
 from re import sub
 from struct import unpack
 from xml.dom.minidom import parseString
 
 from Bio.Seq import Seq
-from Bio.SeqFeature import SeqFeature, FeatureLocation
+from Bio.SeqFeature import FeatureLocation
+from Bio.SeqFeature import SeqFeature
 from Bio.SeqRecord import SeqRecord
+
 from .Interfaces import SequenceIterator
 
 
@@ -135,9 +135,6 @@ def _parse_features_packet(length, data, record):
         quals = {}
 
         type = _get_attribute_value(feature, "type", default="misc_feature")
-        label = _get_attribute_value(feature, "name")
-        if label:
-            quals["label"] = [label]
 
         strand = +1
         directionality = int(
@@ -169,6 +166,16 @@ def _parse_features_packet(length, data, record):
                 elif value.hasAttribute("int"):
                     qvalues.append(int(value.attributes["int"].value))
             quals[qname] = qvalues
+
+        name = _get_attribute_value(feature, "name")
+        if name:
+            if "label" not in quals:
+                # No explicit label attribute, use the SnapGene name
+                quals["label"] = [name]
+            elif name not in quals["label"]:
+                # The SnapGene name is different from the label,
+                # add a specific attribute to represent it
+                quals["name"] = [name]
 
         feature = SeqFeature(location, type=type, qualifiers=quals)
         record.features.append(feature)
