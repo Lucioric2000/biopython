@@ -246,7 +246,7 @@ class Entity:
 
     def get_id(self):
         """Return the id."""
-        return self.id
+        return self._id
 
     def get_full_id(self):
         """Return the full id.
