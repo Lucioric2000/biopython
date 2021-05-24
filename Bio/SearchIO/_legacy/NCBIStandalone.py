@@ -850,7 +850,7 @@ class BlastParser(AbstractParser):
     """Parses BLAST data into a Record.Blast object."""
 
     def __init__(self):
-        """Initialize."""
+        """Initialize the class."""
         self._scanner = _Scanner()
         self._consumer = _BlastConsumer()
 
@@ -864,7 +864,7 @@ class PSIBlastParser(AbstractParser):
     """Parses BLAST data into a Record.PSIBlast object."""
 
     def __init__(self):
-        """Initialize."""
+        """Initialize the class."""
         self._scanner = _Scanner()
         self._consumer = _PSIBlastConsumer()
 
@@ -1778,11 +1778,11 @@ class Iterator:
 
         if query and "BLAST" not in lines[0]:
             # Cheat and re-insert the header
-            # print "-"*50
-            # print "".join(self._header)
-            # print "-"*50
-            # print "".join(lines)
-            # print "-"*50
+            # print("-"*50)
+            # print("".join(self._header))
+            # print("-"*50)
+            # print("".join(lines))
+            # print("-"*50)
             lines = self._header + lines
 
         if not lines:

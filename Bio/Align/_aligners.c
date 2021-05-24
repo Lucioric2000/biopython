@@ -61,8 +61,23 @@ typedef struct {
     int* IxIy;
 } TraceGapsWatermanSmithBeyer;
 
+typedef struct {
+    PyObject_HEAD
+    Trace** M;
+    union { TraceGapsGotoh** gotoh;
+            TraceGapsWatermanSmithBeyer** waterman_smith_beyer; } gaps;
+    int nA;
+    int nB;
+    int iA;
+    int iB;
+    Mode mode;
+    Algorithm algorithm;
+    Py_ssize_t length;
+    unsigned char strand;
+} PathGenerator;
+
 static PyObject*
-_create_path(Trace** M, int i, int j) {
+PathGenerator_create_path(PathGenerator* self, int i, int j) {
     PyObject* tuple;
     PyObject* row;
     PyObject* value;
@@ -71,6 +86,8 @@ _create_path(Trace** M, int i, int j) {
     const int jj = j;
     int n = 1;
     int direction = 0;
+    Trace** M = self->M;
+    const unsigned char strand = self->strand;
 
     while (1) {
         path = M[i][j].path;
@@ -85,58 +102,81 @@ _create_path(Trace** M, int i, int j) {
             case DIAGONAL: i++; j++; break;
         }
     }
+
     i = ii;
     j = jj;
-
     direction = 0;
     tuple = PyTuple_New(n);
     if (!tuple) return NULL;
+
     n = 0;
-    while (1) {
-        path = M[i][j].path;
-        if (path != direction) {
-            row = PyTuple_New(2);
-            if (!row) break;
-            value = PyLong_FromLong(i);
-            if (!value) {
-                Py_DECREF(row); /* all references were stolen */
-                break;
+    switch (strand) {
+        case '+':
+            while (1) {
+                path = M[i][j].path;
+                if (path != direction) {
+                    row = PyTuple_New(2);
+                    if (!row) break;
+                    value = PyLong_FromLong(i);
+                    if (!value) {
+                        Py_DECREF(row); /* all references were stolen */
+                        break;
+                    }
+                    PyTuple_SET_ITEM(row, 0, value);
+                    value = PyLong_FromLong(j);
+                    if (!value) {
+                        Py_DECREF(row); /* all references were stolen */
+                        break;
+                    }
+                    PyTuple_SET_ITEM(row, 1, value);
+                    PyTuple_SET_ITEM(tuple, n, row);
+                    n++;
+                    direction = path;
+                }
+                switch (path) {
+                    case HORIZONTAL: j++; break;
+                    case VERTICAL: i++; break;
+                    case DIAGONAL: i++; j++; break;
+                    default: return tuple;
+                }
             }
-            PyTuple_SET_ITEM(row, 0, value);
-            value = PyLong_FromLong(j);
-            if (!value) {
-                Py_DECREF(row); /* all references were stolen */
-                break;
+            break;
+        case '-': {
+            const int nB = self->nB;
+            while (1) {
+                path = M[i][j].path;
+                if (path != direction) {
+                    row = PyTuple_New(2);
+                    if (!row) break;
+                    value = PyLong_FromLong(i);
+                    if (!value) {
+                        Py_DECREF(row); /* all references were stolen */
+                        break;
+                    }
+                    PyTuple_SET_ITEM(row, 0, value);
+                    value = PyLong_FromLong(nB-j);
+                    if (!value) {
+                        Py_DECREF(row); /* all references were stolen */
+                        break;
+                    }
+                    PyTuple_SET_ITEM(row, 1, value);
+                    PyTuple_SET_ITEM(tuple, n, row);
+                    n++;
+                    direction = path;
+                }
+                switch (path) {
+                    case HORIZONTAL: j++; break;
+                    case VERTICAL: i++; break;
+                    case DIAGONAL: i++; j++; break;
+                    default: return tuple;
+                }
             }
-            PyTuple_SET_ITEM(row, 1, value);
-            PyTuple_SET_ITEM(tuple, n, row);
-            n++;
-            direction = path;
-        }
-        switch (path) {
-            case HORIZONTAL: j++; break;
-            case VERTICAL: i++; break;
-            case DIAGONAL: i++; j++; break;
-            default: return tuple;
+            break;
         }
     }
     Py_DECREF(tuple); /* all references were stolen */
     return PyErr_NoMemory();
 }
-
-typedef struct {
-    PyObject_HEAD
-    Trace** M;
-    union { TraceGapsGotoh** gotoh;
-            TraceGapsWatermanSmithBeyer** waterman_smith_beyer; } gaps;
-    int nA;
-    int nB;
-    int iA;
-    int iB;
-    Mode mode;
-    Algorithm algorithm;
-    Py_ssize_t length;
-} PathGenerator;
 
 static Py_ssize_t
 PathGenerator_needlemanwunsch_length(PathGenerator* self)
@@ -778,7 +818,7 @@ static PyObject* PathGenerator_next_needlemanwunsch(PathGenerator* self)
         else if (trace & DIAGONAL) M[--i][--j].path = DIAGONAL;
         else break;
     }
-    return _create_path(M, 0, 0);
+    return PathGenerator_create_path(self, 0, 0);
 }
 
 static PyObject* PathGenerator_next_smithwaterman(PathGenerator* self)
@@ -859,7 +899,7 @@ static PyObject* PathGenerator_next_smithwaterman(PathGenerator* self)
         else if (trace & STARTPOINT) {
             self->iA = i;
             self->iB = j;
-            return _create_path(M, i, j);
+            return PathGenerator_create_path(self, i, j);
         }
         else {
             PyErr_SetString(PyExc_RuntimeError,
@@ -1001,7 +1041,7 @@ static PyObject* PathGenerator_next_gotoh_global(PathGenerator* self)
         }
         else break;
     }
-    return _create_path(M, 0, 0);
+    return PathGenerator_create_path(self, 0, 0);
 }
 
 static PyObject* PathGenerator_next_gotoh_local(PathGenerator* self)
@@ -1103,7 +1143,7 @@ static PyObject* PathGenerator_next_gotoh_local(PathGenerator* self)
         if (trace == STARTPOINT) {
             self->iA = i;
             self->iB = j;
-            return _create_path(M, i, j);
+            return PathGenerator_create_path(self, i, j);
         }
         switch (m) {
             case M_MATRIX:
@@ -1306,7 +1346,7 @@ PathGenerator_next_waterman_smith_beyer_global(PathGenerator* self)
                 if (trace & M_MATRIX) m = M_MATRIX;
                 else if (trace & Ix_MATRIX) m = Ix_MATRIX;
                 else if (trace & Iy_MATRIX) m = Iy_MATRIX;
-                else return _create_path(M, i, j);
+                else return PathGenerator_create_path(self, i, j);
                 i--;
                 j--;
                 M[i][j].path = DIAGONAL;
@@ -1542,7 +1582,7 @@ PathGenerator_next_waterman_smith_beyer_local(PathGenerator* self)
                 else if (trace == STARTPOINT) {
                     self->iA = i;
                     self->iB = j;
-                    return _create_path(M, i, j);
+                    return PathGenerator_create_path(self, i, j);
                 }
                 else {
                     PyErr_SetString(PyExc_RuntimeError,
@@ -4278,13 +4318,30 @@ static PyGetSetDef Aligner_getset[] = {
     int kB; \
     const double gap_extend_A = self->target_internal_extend_gap_score; \
     const double gap_extend_B = self->query_internal_extend_gap_score; \
-    const double left_gap_extend_A = self->target_left_extend_gap_score; \
-    const double right_gap_extend_A = self->target_right_extend_gap_score; \
-    const double left_gap_extend_B = self->query_left_extend_gap_score; \
-    const double right_gap_extend_B = self->query_right_extend_gap_score; \
     double score; \
     double temp; \
     double* row; \
+    double left_gap_extend_A; \
+    double right_gap_extend_A; \
+    double left_gap_extend_B; \
+    double right_gap_extend_B; \
+    switch (strand) { \
+        case '+': \
+            left_gap_extend_A = self->target_left_extend_gap_score; \
+            right_gap_extend_A = self->target_right_extend_gap_score; \
+            left_gap_extend_B = self->query_left_extend_gap_score; \
+            right_gap_extend_B = self->query_right_extend_gap_score; \
+            break; \
+        case '-': \
+            left_gap_extend_A = self->target_right_extend_gap_score; \
+            right_gap_extend_A = self->target_left_extend_gap_score; \
+            left_gap_extend_B = self->query_right_extend_gap_score; \
+            right_gap_extend_B = self->query_left_extend_gap_score; \
+            break; \
+        default: \
+            PyErr_SetString(PyExc_RuntimeError, "strand was neither '+' nor '-'"); \
+            return NULL; \
+    } \
 \
     /* Needleman-Wunsch algorithm */ \
     row = PyMem_Malloc((nB+1)*sizeof(double)); \
@@ -4391,10 +4448,6 @@ static PyGetSetDef Aligner_getset[] = {
     int kB; \
     const double gap_extend_A = self->target_internal_extend_gap_score; \
     const double gap_extend_B = self->query_internal_extend_gap_score; \
-    const double left_gap_extend_A = self->target_left_extend_gap_score; \
-    const double left_gap_extend_B = self->query_left_extend_gap_score; \
-    const double right_gap_extend_A = self->target_right_extend_gap_score; \
-    const double right_gap_extend_B = self->query_right_extend_gap_score; \
     const double epsilon = self->epsilon; \
     Trace** M; \
     double score; \
@@ -4402,9 +4455,30 @@ static PyGetSetDef Aligner_getset[] = {
     double temp; \
     double* row = NULL; \
     PathGenerator* paths; \
+    double left_gap_extend_A; \
+    double right_gap_extend_A; \
+    double left_gap_extend_B; \
+    double right_gap_extend_B; \
+    switch (strand) { \
+        case '+': \
+            left_gap_extend_A = self->target_left_extend_gap_score; \
+            right_gap_extend_A = self->target_right_extend_gap_score; \
+            left_gap_extend_B = self->query_left_extend_gap_score; \
+            right_gap_extend_B = self->query_right_extend_gap_score; \
+            break; \
+        case '-': \
+            left_gap_extend_A = self->target_right_extend_gap_score; \
+            right_gap_extend_A = self->target_left_extend_gap_score; \
+            left_gap_extend_B = self->query_right_extend_gap_score; \
+            right_gap_extend_B = self->query_left_extend_gap_score; \
+            break; \
+        default: \
+            PyErr_SetString(PyExc_RuntimeError, "strand was neither '+' nor '-'"); \
+            return NULL; \
+    } \
 \
     /* Needleman-Wunsch algorithm */ \
-    paths = PathGenerator_create_NWSW(nA, nB, Global); \
+    paths = PathGenerator_create_NWSW(nA, nB, Global, strand); \
     if (!paths) return NULL; \
     row = PyMem_Malloc((nB+1)*sizeof(double)); \
     if (!row) { \
@@ -4458,7 +4532,7 @@ static PyGetSetDef Aligner_getset[] = {
     PathGenerator* paths = NULL; \
 \
     /* Smith-Waterman algorithm */ \
-    paths = PathGenerator_create_NWSW(nA, nB, Local); \
+    paths = PathGenerator_create_NWSW(nA, nB, Local, strand); \
     if (!paths) return NULL; \
     row = PyMem_Malloc((nB+1)*sizeof(double)); \
     if (!row) { \
@@ -4532,14 +4606,14 @@ static PyGetSetDef Aligner_getset[] = {
     const double gap_open_B = self->query_internal_open_gap_score; \
     const double gap_extend_A = self->target_internal_extend_gap_score; \
     const double gap_extend_B = self->query_internal_extend_gap_score; \
-    const double left_gap_open_A = self->target_left_open_gap_score; \
-    const double left_gap_open_B = self->query_left_open_gap_score; \
-    const double left_gap_extend_A = self->target_left_extend_gap_score; \
-    const double left_gap_extend_B = self->query_left_extend_gap_score; \
-    const double right_gap_open_A = self->target_right_open_gap_score; \
-    const double right_gap_open_B = self->query_right_open_gap_score; \
-    const double right_gap_extend_A = self->target_right_extend_gap_score; \
-    const double right_gap_extend_B = self->query_right_extend_gap_score; \
+    double left_gap_open_A; \
+    double left_gap_open_B; \
+    double left_gap_extend_A; \
+    double left_gap_extend_B; \
+    double right_gap_open_A; \
+    double right_gap_open_B; \
+    double right_gap_extend_A; \
+    double right_gap_extend_B; \
     double* M_row = NULL; \
     double* Ix_row = NULL; \
     double* Iy_row = NULL; \
@@ -4548,6 +4622,31 @@ static PyGetSetDef Aligner_getset[] = {
     double M_temp; \
     double Ix_temp; \
     double Iy_temp; \
+    switch (strand) { \
+        case '+': \
+            left_gap_open_A = self->target_left_open_gap_score; \
+            left_gap_open_B = self->query_left_open_gap_score; \
+            left_gap_extend_A = self->target_left_extend_gap_score; \
+            left_gap_extend_B = self->query_left_extend_gap_score; \
+            right_gap_open_A = self->target_right_open_gap_score; \
+            right_gap_open_B = self->query_right_open_gap_score; \
+            right_gap_extend_A = self->target_right_extend_gap_score; \
+            right_gap_extend_B = self->query_right_extend_gap_score; \
+            break; \
+        case '-': \
+            left_gap_open_A = self->target_right_open_gap_score; \
+            left_gap_open_B = self->query_right_open_gap_score; \
+            left_gap_extend_A = self->target_right_extend_gap_score; \
+            left_gap_extend_B = self->query_right_extend_gap_score; \
+            right_gap_open_A = self->target_left_open_gap_score; \
+            right_gap_open_B = self->query_left_open_gap_score; \
+            right_gap_extend_A = self->target_left_extend_gap_score; \
+            right_gap_extend_B = self->query_left_extend_gap_score; \
+            break; \
+        default: \
+            PyErr_SetString(PyExc_RuntimeError, "strand was neither '+' nor '-'"); \
+            return NULL; \
+    } \
 \
     /* Gotoh algorithm with three states */ \
     M_row = PyMem_Malloc((nB+1)*sizeof(double)); \
@@ -4787,14 +4886,14 @@ exit: \
     const double gap_open_B = self->query_internal_open_gap_score; \
     const double gap_extend_A = self->target_internal_extend_gap_score; \
     const double gap_extend_B = self->query_internal_extend_gap_score; \
-    const double left_gap_open_A = self->target_left_open_gap_score; \
-    const double left_gap_open_B = self->query_left_open_gap_score; \
-    const double left_gap_extend_A = self->target_left_extend_gap_score; \
-    const double left_gap_extend_B = self->query_left_extend_gap_score; \
-    const double right_gap_open_A = self->target_right_open_gap_score; \
-    const double right_gap_open_B = self->query_right_open_gap_score; \
-    const double right_gap_extend_A = self->target_right_extend_gap_score; \
-    const double right_gap_extend_B = self->query_right_extend_gap_score; \
+    double left_gap_open_A; \
+    double left_gap_open_B; \
+    double left_gap_extend_A; \
+    double left_gap_extend_B; \
+    double right_gap_open_A; \
+    double right_gap_open_B; \
+    double right_gap_extend_A; \
+    double right_gap_extend_B; \
     const double epsilon = self->epsilon; \
     TraceGapsGotoh** gaps = NULL; \
     Trace** M = NULL; \
@@ -4808,9 +4907,34 @@ exit: \
     double Ix_temp; \
     double Iy_temp; \
     PathGenerator* paths; \
+    switch (strand) { \
+        case '+': \
+            left_gap_open_A = self->target_left_open_gap_score; \
+            left_gap_open_B = self->query_left_open_gap_score; \
+            left_gap_extend_A = self->target_left_extend_gap_score; \
+            left_gap_extend_B = self->query_left_extend_gap_score; \
+            right_gap_open_A = self->target_right_open_gap_score; \
+            right_gap_open_B = self->query_right_open_gap_score; \
+            right_gap_extend_A = self->target_right_extend_gap_score; \
+            right_gap_extend_B = self->query_right_extend_gap_score; \
+            break; \
+        case '-': \
+            left_gap_open_A = self->target_right_open_gap_score; \
+            left_gap_open_B = self->query_right_open_gap_score; \
+            left_gap_extend_A = self->target_right_extend_gap_score; \
+            left_gap_extend_B = self->query_right_extend_gap_score; \
+            right_gap_open_A = self->target_left_open_gap_score; \
+            right_gap_open_B = self->query_left_open_gap_score; \
+            right_gap_extend_A = self->target_left_extend_gap_score; \
+            right_gap_extend_B = self->query_left_extend_gap_score; \
+            break; \
+        default: \
+            PyErr_SetString(PyExc_RuntimeError, "strand was neither '+' nor '-'"); \
+            return NULL; \
+    } \
 \
     /* Gotoh algorithm with three states */ \
-    paths = PathGenerator_create_Gotoh(nA, nB, Global); \
+    paths = PathGenerator_create_Gotoh(nA, nB, Global, strand); \
     if (!paths) return NULL; \
     M_row = PyMem_Malloc((nB+1)*sizeof(double)); \
     if (!M_row) goto exit; \
@@ -4955,7 +5079,7 @@ exit: \
     PathGenerator* paths; \
  \
     /* Gotoh algorithm with three states */ \
-    paths = PathGenerator_create_Gotoh(nA, nB, Local); \
+    paths = PathGenerator_create_Gotoh(nA, nB, Local, strand); \
     if (!paths) return NULL; \
     M = paths->M; \
     gaps = paths->gaps.gotoh; \
@@ -5116,9 +5240,9 @@ exit: \
     return PyErr_NoMemory(); \
 
 
-#define WATERMANSMITHBEYER_GLOBAL_SCORE(align_score) \
+#define WATERMANSMITHBEYER_ENTER_SCORE \
     int i; \
-    int j; \
+    int j = 0; \
     int k; \
     int kA; \
     int kB; \
@@ -5126,9 +5250,10 @@ exit: \
     double** Ix = NULL; \
     double** Iy = NULL; \
     double score = 0.0; \
-    double gapscore; \
+    double gapscore = 0.0; \
     double temp; \
     int ok = 1; \
+    PyObject* result = NULL; \
 \
     /* Waterman-Smith-Beyer algorithm */ \
     M = PyMem_Malloc((nA+1)*sizeof(double*)); \
@@ -5145,7 +5270,9 @@ exit: \
         Iy[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
         if (!Iy[i]) goto exit; \
     } \
-\
+
+
+#define WATERMANSMITHBEYER_GLOBAL_SCORE(align_score, query_gap_start) \
     /* The top row of the score matrix is a special case, \
      *  as there are no previously aligned characters. \
      */ \
@@ -5153,17 +5280,17 @@ exit: \
     Ix[0][0] = -DBL_MAX; \
     Iy[0][0] = -DBL_MAX; \
     for (i = 1; i <= nA; i++) { \
-        ok = _call_query_gap_function(self, 0, i, &score); \
-        if (!ok) goto exit; \
         M[i][0] = -DBL_MAX; \
-        Ix[i][0] = score; \
         Iy[i][0] = -DBL_MAX; \
+        ok = _call_query_gap_function(self, query_gap_start, i, &score); \
+        if (!ok) goto exit; \
+        Ix[i][0] = score; \
     } \
     for (j = 1; j <= nB; j++) { \
-        ok = _call_target_gap_function(self, 0, j, &score); \
-        if (!ok) goto exit; \
         M[0][j] = -DBL_MAX; \
         Ix[0][j] = -DBL_MAX; \
+        ok = _call_target_gap_function(self, 0, j, &score); \
+        if (!ok) goto exit; \
         Iy[0][j] = score; \
     } \
     for (i = 1; i <= nA; i++) { \
@@ -5174,7 +5301,7 @@ exit: \
             M[i][j] = score + (align_score); \
             score = -DBL_MAX; \
             for (k = 1; k <= i; k++) { \
-                ok = _call_query_gap_function(self, j, k, &gapscore); \
+                ok = _call_query_gap_function(self, query_gap_start, k, &gapscore); \
                 if (!ok) goto exit; \
                 SELECT_SCORE_WATERMAN_SMITH_BEYER(M[i-k][j], Iy[i-k][j]); \
             } \
@@ -5190,62 +5317,10 @@ exit: \
     } \
     SELECT_SCORE_GLOBAL(M[nA][nB], Ix[nA][nB], Iy[nA][nB]); \
 \
-exit: \
-    if (M) { \
-        /* If M is NULL, then Ix is also NULL. */ \
-        if (Ix) { \
-            /* If Ix is NULL, then Iy is also NULL. */ \
-            if (Iy) { \
-                /* If Iy is NULL, then M[i], Ix[i], and Iy[i] are also NULL. */  \
-                for (i = 0; i <= nA; i++) { \
-                    if (!M[i]) break; \
-                    PyMem_Free(M[i]);  \
-                    if (!Ix[i]) break; \
-                    PyMem_Free(Ix[i]); \
-                    if (!Iy[i]) break; \
-                    PyMem_Free(Iy[i]); \
-                } \
-                PyMem_Free(Iy); \
-            } \
-            PyMem_Free(Ix); \
-        } \
-        PyMem_Free(M); \
-    } \
-    if (!ok) return NULL; \
-    return PyFloat_FromDouble(score); \
+    result = PyFloat_FromDouble(score); \
 
 
-#define WATERMANSMITHBEYER_LOCAL_SCORE(align_score) \
-    int i; \
-    int j; \
-    int gap; \
-    int kA; \
-    int kB; \
-    double** M = NULL; \
-    double** Ix = NULL; \
-    double** Iy = NULL; \
-    double score = 0.0; \
-    double gapscore = 0.0; \
-    double temp; \
-    int ok = 1; \
-    double maximum = 0.0; \
-    PyObject* result = NULL; \
- \
-    /* Waterman-Smith-Beyer algorithm */ \
-    M = PyMem_Malloc((nA+1)*sizeof(double*)); \
-    if (!M) goto exit; \
-    Ix = PyMem_Malloc((nA+1)*sizeof(double*)); \
-    if (!Ix) goto exit; \
-    Iy = PyMem_Malloc((nA+1)*sizeof(double*)); \
-    if (!Iy) goto exit; \
-    for (i = 0; i <= nA; i++) { \
-        M[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
-        if (!M[i]) goto exit; \
-        Ix[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
-        if (!Ix[i]) goto exit; \
-        Iy[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
-        if (!Iy[i]) goto exit; \
-    } \
+#define WATERMANSMITHBEYER_LOCAL_SCORE(align_score, query_gap_start) \
     /* The top row of the score matrix is a special case, \
      *  as there are no previously aligned characters. \
      */ \
@@ -5277,18 +5352,18 @@ exit: \
                 continue; \
             } \
             score = 0.0; \
-            for (gap = 1; gap <= i; gap++) { \
-                ok = _call_query_gap_function(self, j, gap, &gapscore); \
-                SELECT_SCORE_WATERMAN_SMITH_BEYER(M[i-gap][j], Iy[i-gap][j]); \
+            for (k = 1; k <= i; k++) { \
+                ok = _call_query_gap_function(self, query_gap_start, k, &gapscore); \
+                SELECT_SCORE_WATERMAN_SMITH_BEYER(M[i-k][j], Iy[i-k][j]); \
                 if (!ok) goto exit; \
             } \
             if (score > maximum) maximum = score; \
             Ix[i][j] = score; \
             score = 0.0; \
-            for (gap = 1; gap <= j; gap++) { \
-                ok = _call_target_gap_function(self, i, gap, &gapscore); \
+            for (k = 1; k <= j; k++) { \
+                ok = _call_target_gap_function(self, i, k, &gapscore); \
                 if (!ok) goto exit; \
-                SELECT_SCORE_WATERMAN_SMITH_BEYER(M[i][j-gap], Ix[i][j-gap]); \
+                SELECT_SCORE_WATERMAN_SMITH_BEYER(M[i][j-k], Ix[i][j-k]); \
             } \
             if (score > maximum) maximum = score; \
             Iy[i][j] = score; \
@@ -5297,6 +5372,9 @@ exit: \
     SELECT_SCORE_GLOBAL(M[nA][nB], Ix[nA][nB], Iy[nA][nB]); \
     if (score > maximum) maximum = score; \
     result = PyFloat_FromDouble(maximum); \
+
+
+#define WATERMANSMITHBEYER_EXIT_SCORE \
 exit: \
     if (M) { \
         /* If M is NULL, then Ix is also NULL. */ \
@@ -5324,18 +5402,18 @@ exit: \
     return result; \
 
 
-#define WATERMANSMITHBEYER_GLOBAL_ALIGN(align_score) \
+#define WATERMANSMITHBEYER_ENTER_ALIGN(mode) \
     int i; \
-    int j; \
+    int j = 0; \
     int gap; \
     int kA; \
     int kB; \
     const double epsilon = self->epsilon; \
     Trace** M; \
     TraceGapsWatermanSmithBeyer** gaps; \
-    double** M_row = NULL; \
-    double** Ix_row = NULL; \
-    double** Iy_row = NULL; \
+    double** M_row; \
+    double** Ix_row; \
+    double** Iy_row; \
     int ng; \
     int nm; \
     double score; \
@@ -5348,7 +5426,7 @@ exit: \
     PathGenerator* paths = NULL; \
  \
     /* Waterman-Smith-Beyer algorithm */ \
-    paths = PathGenerator_create_WSB(nA, nB, Global); \
+    paths = PathGenerator_create_WSB(nA, nB, mode, strand); \
     if (!paths) return NULL; \
     M = paths->M; \
     gaps = paths->gaps.waterman_smith_beyer; \
@@ -5361,28 +5439,28 @@ exit: \
     for (i = 0; i <= nA; i++) { \
         M_row[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
         if (!M_row[i]) goto exit; \
-        M_row[i][0] = -DBL_MAX; \
         Ix_row[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
         if (!Ix_row[i]) goto exit; \
-        Ix_row[i][0] = 0; \
         Iy_row[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
         if (!Iy_row[i]) goto exit; \
-        Iy_row[i][0] = -DBL_MAX; \
     } \
+
+
+#define WATERMANSMITHBEYER_GLOBAL_ALIGN(align_score, query_gap_start) \
     M_row[0][0] = 0; \
     Ix_row[0][0] = -DBL_MAX; \
-    for (i = 1; i <= nB; i++) { \
-        M_row[0][i] = -DBL_MAX; \
-        Ix_row[0][i] = -DBL_MAX; \
-        Iy_row[0][i] = 0; \
-    } \
+    Iy_row[0][0] = -DBL_MAX; \
     for (i = 1; i <= nA; i++) { \
-        ok = _call_query_gap_function(self, 0, i, &score); \
+        M_row[i][0] = -DBL_MAX; \
+        Iy_row[i][0] = -DBL_MAX; \
+        ok = _call_query_gap_function(self, query_gap_start, i, &score); \
         if (!ok) goto exit; \
         Ix_row[i][0] = score; \
     } \
     for (j = 1; j <= nB; j++) { \
-        ok = _call_target_gap_function(self, 0, j, &score); \
+        M_row[0][j] = -DBL_MAX; \
+        Ix_row[0][j] = -DBL_MAX; \
+        ok = _call_target_gap_function(self, query_gap_start, j, &score); \
         if (!ok) goto exit; \
         Iy_row[0][j] = score; \
     } \
@@ -5401,7 +5479,7 @@ exit: \
             ng = 0; \
             score = -DBL_MAX; \
             for (gap = 1; gap <= i; gap++) { \
-                ok = _call_query_gap_function(self, j, gap, &gapscore); \
+                ok = _call_query_gap_function(self, query_gap_start, gap, &gapscore); \
                 if (!ok) goto exit; \
                 SELECT_TRACE_WATERMAN_SMITH_BEYER_GAP(M_row[i-gap][j], \
                                                       Iy_row[i-gap][j]); \
@@ -5474,80 +5552,15 @@ exit: \
     PyMem_Free(Ix_row); \
     PyMem_Free(Iy_row); \
     return Py_BuildValue("fN", score, paths); \
-\
-exit: \
-    if (ok) /* otherwise, an exception was already set */ \
-        PyErr_SetNone(PyExc_MemoryError); \
-    Py_DECREF(paths); \
-    if (M_row) { \
-        /* If M is NULL, then Ix is also NULL. */ \
-        if (Ix_row) { \
-            /* If Ix is NULL, then Iy is also NULL. */ \
-            if (Iy_row) { \
-                /* If Iy is NULL, then M[i], Ix[i], and Iy[i] are also NULL. */ \
-                for (i = 0; i <= nA; i++) { \
-                    if (!M_row[i]) break; \
-                    PyMem_Free(M_row[i]); \
-                    if (!Ix_row[i]) break; \
-                    PyMem_Free(Ix_row[i]); \
-                    if (!Iy_row[i]) break; \
-                    PyMem_Free(Iy_row[i]); \
-                } \
-                PyMem_Free(Iy_row); \
-            } \
-            PyMem_Free(Ix_row); \
-        } \
-        PyMem_Free(M_row); \
-    } \
-    return NULL; \
 
 
-#define WATERMANSMITHBEYER_LOCAL_ALIGN(align_score) \
-    int i; \
-    int j; \
-    int im = nA; \
-    int jm = nB; \
-    int gap; \
-    int kA; \
-    int kB; \
-    const double epsilon = self->epsilon; \
-    Trace** M = NULL; \
-    TraceGapsWatermanSmithBeyer** gaps; \
-    double** M_row; \
-    double** Ix_row = NULL; \
-    double** Iy_row = NULL; \
-    double score; \
-    double gapscore; \
-    double temp; \
-    int trace; \
-    int* gapM; \
-    int* gapXY; \
-    int nm; \
-    int ng; \
-    int ok = 1; \
-    double maximum = 0; \
-    PathGenerator* paths = NULL; \
- \
-    /* Waterman-Smith-Beyer algorithm */ \
-    paths = PathGenerator_create_WSB(nA, nB, Local); \
-    if (!paths) return NULL; \
-    M = paths->M; \
-    gaps = paths->gaps.waterman_smith_beyer; \
-    M_row = PyMem_Malloc((nA+1)*sizeof(double*)); \
-    if (!M_row) goto exit; \
-    Ix_row = PyMem_Malloc((nA+1)*sizeof(double*)); \
-    if (!Ix_row) goto exit; \
-    Iy_row = PyMem_Malloc((nA+1)*sizeof(double*)); \
-    if (!Iy_row) goto exit; \
-    for (i = 0; i <= nA; i++) { \
-        M_row[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
-        if (!M_row[i]) goto exit; \
+#define WATERMANSMITHBEYER_LOCAL_ALIGN(align_score, query_gap_start) \
+    M_row[0][0] = 0; \
+    Ix_row[0][0] = -DBL_MAX; \
+    Iy_row[0][0] = -DBL_MAX; \
+    for (i = 1; i <= nA; i++) { \
         M_row[i][0] = 0; \
-        Ix_row[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
-        if (!Ix_row[i]) goto exit; \
         Ix_row[i][0] = -DBL_MAX; \
-        Iy_row[i] = PyMem_Malloc((nB+1)*sizeof(double)); \
-        if (!Iy_row[i]) goto exit; \
         Iy_row[i][0] = -DBL_MAX; \
     } \
     for (i = 1; i <= nB; i++) { \
@@ -5584,7 +5597,7 @@ exit: \
             gaps[i][j].IyIx = gapXY; \
             score = -DBL_MAX; \
             for (gap = 1; gap <= i; gap++) { \
-                ok = _call_query_gap_function(self, j, gap, &gapscore); \
+                ok = _call_query_gap_function(self, query_gap_start, gap, &gapscore); \
                 if (!ok) goto exit; \
                 SELECT_TRACE_WATERMAN_SMITH_BEYER_GAP(M_row[i-gap][j], \
                                                       Iy_row[i-gap][j]); \
@@ -5720,7 +5733,9 @@ exit: \
     if (maximum == 0) M[0][0].path = DONE; \
     else M[0][0].path = 0; \
     return Py_BuildValue("fN", maximum, paths); \
-\
+
+
+#define WATERMANSMITHBEYER_EXIT_ALIGN \
 exit: \
     if (ok) /* otherwise, an exception was already set */ \
         PyErr_SetNone(PyExc_MemoryError); \
@@ -5751,7 +5766,7 @@ exit: \
 /* -------------- allocation & deallocation ------------- */
 
 static PathGenerator*
-PathGenerator_create_NWSW(Py_ssize_t nA, Py_ssize_t nB, Mode mode)
+PathGenerator_create_NWSW(Py_ssize_t nA, Py_ssize_t nB, Mode mode, unsigned char strand)
 {
     int i;
     unsigned char trace = 0;
@@ -5771,6 +5786,7 @@ PathGenerator_create_NWSW(Py_ssize_t nA, Py_ssize_t nB, Mode mode)
     paths->algorithm = NeedlemanWunschSmithWaterman;
     paths->mode = mode;
     paths->length = 0;
+    paths->strand = strand;
 
     M = PyMem_Malloc((nA+1)*sizeof(Trace*));
     paths->M = M;
@@ -5798,7 +5814,7 @@ exit:
 }
 
 static PathGenerator*
-PathGenerator_create_Gotoh(Py_ssize_t nA, Py_ssize_t nB, Mode mode)
+PathGenerator_create_Gotoh(Py_ssize_t nA, Py_ssize_t nB, Mode mode, unsigned char strand)
 {
     int i;
     unsigned char trace;
@@ -5832,6 +5848,7 @@ PathGenerator_create_Gotoh(Py_ssize_t nA, Py_ssize_t nB, Mode mode)
     paths->algorithm = Gotoh;
     paths->mode = mode;
     paths->length = 0;
+    paths->strand = strand;
 
     M = PyMem_Malloc((nA+1)*sizeof(Trace*));
     if (!M) goto exit;
@@ -5885,7 +5902,7 @@ exit:
 }
 
 static PathGenerator*
-PathGenerator_create_WSB(Py_ssize_t nA, Py_ssize_t nB, Mode mode)
+PathGenerator_create_WSB(Py_ssize_t nA, Py_ssize_t nB, Mode mode, unsigned char strand)
 {
     int i, j;
     int* trace;
@@ -5905,6 +5922,7 @@ PathGenerator_create_WSB(Py_ssize_t nA, Py_ssize_t nB, Mode mode)
     paths->algorithm = WatermanSmithBeyer;
     paths->mode = mode;
     paths->length = 0;
+    paths->strand = strand;
 
     M = PyMem_Malloc((nA+1)*sizeof(Trace*));
     if (!M) goto exit;
@@ -5981,7 +5999,8 @@ exit:
 static PyObject*
 Aligner_needlemanwunsch_score_compare(Aligner* self,
                                       const int* sA, Py_ssize_t nA,
-                                      const int* sB, Py_ssize_t nB)
+                                      const int* sB, Py_ssize_t nB,
+                                      unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
@@ -5992,7 +6011,8 @@ Aligner_needlemanwunsch_score_compare(Aligner* self,
 static PyObject*
 Aligner_needlemanwunsch_score_matrix(Aligner* self,
                                      const int* sA, Py_ssize_t nA,
-                                     const int* sB, Py_ssize_t nB)
+                                     const int* sB, Py_ssize_t nB,
+                                     unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
@@ -6023,7 +6043,8 @@ Aligner_smithwaterman_score_matrix(Aligner* self,
 static PyObject*
 Aligner_needlemanwunsch_align_compare(Aligner* self,
                                       const int* sA, Py_ssize_t nA,
-                                      const int* sB, Py_ssize_t nB)
+                                      const int* sB, Py_ssize_t nB,
+                                      unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
@@ -6034,7 +6055,8 @@ Aligner_needlemanwunsch_align_compare(Aligner* self,
 static PyObject*
 Aligner_needlemanwunsch_align_matrix(Aligner* self,
                                      const int* sA, Py_ssize_t nA,
-                                     const int* sB, Py_ssize_t nB)
+                                     const int* sB, Py_ssize_t nB,
+                                     unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
@@ -6044,7 +6066,8 @@ Aligner_needlemanwunsch_align_matrix(Aligner* self,
 static PyObject*
 Aligner_smithwaterman_align_compare(Aligner* self,
                                     const int* sA, Py_ssize_t nA,
-                                    const int* sB, Py_ssize_t nB)
+                                    const int* sB, Py_ssize_t nB,
+                                    unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
@@ -6055,7 +6078,8 @@ Aligner_smithwaterman_align_compare(Aligner* self,
 static PyObject*
 Aligner_smithwaterman_align_matrix(Aligner* self,
                                    const int* sA, Py_ssize_t nA,
-                                   const int* sB, Py_ssize_t nB)
+                                   const int* sB, Py_ssize_t nB,
+                                   unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
@@ -6065,7 +6089,8 @@ Aligner_smithwaterman_align_matrix(Aligner* self,
 static PyObject*
 Aligner_gotoh_global_score_compare(Aligner* self,
                                    const int* sA, Py_ssize_t nA,
-                                   const int* sB, Py_ssize_t nB)
+                                   const int* sB, Py_ssize_t nB,
+                                   unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
@@ -6076,7 +6101,8 @@ Aligner_gotoh_global_score_compare(Aligner* self,
 static PyObject*
 Aligner_gotoh_global_score_matrix(Aligner* self,
                                   const int* sA, Py_ssize_t nA,
-                                  const int* sB, Py_ssize_t nB)
+                                  const int* sB, Py_ssize_t nB,
+                                  unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
@@ -6107,7 +6133,8 @@ Aligner_gotoh_local_score_matrix(Aligner* self,
 static PyObject*
 Aligner_gotoh_global_align_compare(Aligner* self,
                                    const int* sA, Py_ssize_t nA,
-                                   const int* sB, Py_ssize_t nB)
+                                   const int* sB, Py_ssize_t nB,
+                                   unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
@@ -6118,7 +6145,8 @@ Aligner_gotoh_global_align_compare(Aligner* self,
 static PyObject*
 Aligner_gotoh_global_align_matrix(Aligner* self,
                                   const int* sA, Py_ssize_t nA,
-                                  const int* sB, Py_ssize_t nB)
+                                  const int* sB, Py_ssize_t nB,
+                                  unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
@@ -6128,7 +6156,8 @@ Aligner_gotoh_global_align_matrix(Aligner* self,
 static PyObject*
 Aligner_gotoh_local_align_compare(Aligner* self,
                                   const int* sA, Py_ssize_t nA,
-                                  const int* sB, Py_ssize_t nB)
+                                  const int* sB, Py_ssize_t nB,
+                                  unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
@@ -6139,7 +6168,8 @@ Aligner_gotoh_local_align_compare(Aligner* self,
 static PyObject*
 Aligner_gotoh_local_align_matrix(Aligner* self,
                                  const int* sA, Py_ssize_t nA,
-                                 const int* sB, Py_ssize_t nB)
+                                 const int* sB, Py_ssize_t nB,
+                                 unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
@@ -6189,85 +6219,187 @@ _call_target_gap_function(Aligner* aligner, int i, int j, double* score)
 static PyObject*
 Aligner_watermansmithbeyer_global_score_compare(Aligner* self,
                                                 const int* sA, Py_ssize_t nA,
-                                                const int* sB, Py_ssize_t nB)
+                                                const int* sB, Py_ssize_t nB,
+                                                unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
     const int wildcard = self->wildcard;
-    WATERMANSMITHBEYER_GLOBAL_SCORE(COMPARE_SCORE);
+    WATERMANSMITHBEYER_ENTER_SCORE;
+    switch (strand) {
+        case '+': {
+            WATERMANSMITHBEYER_GLOBAL_SCORE(COMPARE_SCORE, j);
+            break;
+        }
+        case '-': {
+            WATERMANSMITHBEYER_GLOBAL_SCORE(COMPARE_SCORE, nB-j);
+            break;
+	}
+    }
+    WATERMANSMITHBEYER_EXIT_SCORE;
 }
 
 static PyObject*
 Aligner_watermansmithbeyer_global_score_matrix(Aligner* self,
                                                const int* sA, Py_ssize_t nA,
-                                               const int* sB, Py_ssize_t nB)
+                                               const int* sB, Py_ssize_t nB,
+                                               unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
-    WATERMANSMITHBEYER_GLOBAL_SCORE(MATRIX_SCORE);
+    WATERMANSMITHBEYER_ENTER_SCORE;
+    switch (strand) {
+        case '+':
+            WATERMANSMITHBEYER_GLOBAL_SCORE(MATRIX_SCORE, j);
+            break;
+        case '-':
+            WATERMANSMITHBEYER_GLOBAL_SCORE(MATRIX_SCORE, nB-j);
+            break;
+    }
+    WATERMANSMITHBEYER_EXIT_SCORE;
 }
 
 static PyObject*
 Aligner_watermansmithbeyer_local_score_compare(Aligner* self,
                                                const int* sA, Py_ssize_t nA,
-                                               const int* sB, Py_ssize_t nB)
+                                               const int* sB, Py_ssize_t nB,
+                                               unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
     const int wildcard = self->wildcard;
-    WATERMANSMITHBEYER_LOCAL_SCORE(COMPARE_SCORE);
+    double maximum = 0.0;
+    WATERMANSMITHBEYER_ENTER_SCORE;
+    switch (strand) {
+        case '+': {
+            WATERMANSMITHBEYER_LOCAL_SCORE(COMPARE_SCORE, j);
+            break;
+        }
+        case '-': {
+            WATERMANSMITHBEYER_LOCAL_SCORE(COMPARE_SCORE, nB-j);
+            break;
+        }
+    }
+    WATERMANSMITHBEYER_EXIT_SCORE;
 }
 
 static PyObject*
 Aligner_watermansmithbeyer_local_score_matrix(Aligner* self,
                                               const int* sA, Py_ssize_t nA,
-                                              const int* sB, Py_ssize_t nB)
+                                              const int* sB, Py_ssize_t nB,
+                                              unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
-    WATERMANSMITHBEYER_LOCAL_SCORE(MATRIX_SCORE);
+    double maximum = 0.0;
+    WATERMANSMITHBEYER_ENTER_SCORE;
+    switch (strand) {
+        case '+': {
+            WATERMANSMITHBEYER_LOCAL_SCORE(MATRIX_SCORE, j);
+            break;
+        }
+        case '-': {
+            WATERMANSMITHBEYER_LOCAL_SCORE(MATRIX_SCORE, nB-j);
+            break;
+        }
+    }
+    WATERMANSMITHBEYER_EXIT_SCORE;
 }
 
 static PyObject*
 Aligner_watermansmithbeyer_global_align_compare(Aligner* self,
                                                 const int* sA, Py_ssize_t nA,
-                                                const int* sB, Py_ssize_t nB)
+                                                const int* sB, Py_ssize_t nB,
+                                                unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
     const int wildcard = self->wildcard;
-    WATERMANSMITHBEYER_GLOBAL_ALIGN(COMPARE_SCORE);
+    WATERMANSMITHBEYER_ENTER_ALIGN(Global);
+    switch (strand) {
+        case '+': {
+            WATERMANSMITHBEYER_GLOBAL_ALIGN(COMPARE_SCORE, j);
+            break;
+        }
+        case '-': {
+            WATERMANSMITHBEYER_GLOBAL_ALIGN(COMPARE_SCORE, nB-j);
+            break;
+	}
+    }
+    WATERMANSMITHBEYER_EXIT_ALIGN;
 }
 
 static PyObject*
 Aligner_watermansmithbeyer_global_align_matrix(Aligner* self,
                                                const int* sA, Py_ssize_t nA,
-                                               const int* sB, Py_ssize_t nB)
+                                               const int* sB, Py_ssize_t nB,
+                                               unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
-    WATERMANSMITHBEYER_GLOBAL_ALIGN(MATRIX_SCORE);
+    WATERMANSMITHBEYER_ENTER_ALIGN(Global);
+    switch (strand) {
+        case '+': {
+            WATERMANSMITHBEYER_GLOBAL_ALIGN(MATRIX_SCORE, j);
+            break;
+        }
+        case '-': {
+            WATERMANSMITHBEYER_GLOBAL_ALIGN(MATRIX_SCORE, nB-j);
+            break;
+	}
+    }
+    WATERMANSMITHBEYER_EXIT_ALIGN;
 }
 
 static PyObject*
 Aligner_watermansmithbeyer_local_align_compare(Aligner* self,
                                                const int* sA, Py_ssize_t nA,
-                                               const int* sB, Py_ssize_t nB)
+                                               const int* sB, Py_ssize_t nB,
+                                               unsigned char strand)
 {
     const double match = self->match;
     const double mismatch = self->mismatch;
     const int wildcard = self->wildcard;
-    WATERMANSMITHBEYER_LOCAL_ALIGN(COMPARE_SCORE);
+    int im = nA;
+    int jm = nB;
+    double maximum = 0;
+    WATERMANSMITHBEYER_ENTER_ALIGN(Local);
+    switch (strand) {
+        case '+': {
+            WATERMANSMITHBEYER_LOCAL_ALIGN(COMPARE_SCORE, j);
+            break;
+        }
+        case '-': {
+            WATERMANSMITHBEYER_LOCAL_ALIGN(COMPARE_SCORE, nB-j);
+            break;
+	}
+    }
+    WATERMANSMITHBEYER_EXIT_ALIGN;
 }
 
 static PyObject*
 Aligner_watermansmithbeyer_local_align_matrix(Aligner* self,
                                               const int* sA, Py_ssize_t nA,
-                                              const int* sB, Py_ssize_t nB)
+                                              const int* sB, Py_ssize_t nB,
+                                              unsigned char strand)
 {
     const Py_ssize_t n = self->substitution_matrix.shape[0];
     const double* scores = self->substitution_matrix.buf;
-    WATERMANSMITHBEYER_LOCAL_ALIGN(MATRIX_SCORE);
+    int im = nA;
+    int jm = nB;
+    double maximum = 0;
+    WATERMANSMITHBEYER_ENTER_ALIGN(Local);
+    switch (strand) {
+        case '+': {
+            WATERMANSMITHBEYER_LOCAL_ALIGN(MATRIX_SCORE, j);
+            break;
+        }
+        case '-': {
+            WATERMANSMITHBEYER_LOCAL_ALIGN(MATRIX_SCORE, nB-j);
+            break;
+	}
+    }
+    WATERMANSMITHBEYER_EXIT_ALIGN;
 }
 
 static int*
@@ -6470,6 +6602,7 @@ sequence_converter(PyObject* argument, void* pointer)
             }
             indices = convert_1bytes_to_ints(aligner->mapping, n, view->buf);
             if (!indices) return 0;
+            PyBuffer_Release(view);
             view->itemsize = 1;
             view->len = n;
             view->buf = indices;
@@ -6549,6 +6682,26 @@ sequence_converter(PyObject* argument, void* pointer)
     return 0;
 }
  
+static int
+strand_converter(PyObject* argument, void* pointer)
+{
+    if (!PyUnicode_Check(argument)) goto error;
+    if (PyUnicode_READY(argument) == -1) return 0;
+    if (PyUnicode_GET_LENGTH(argument) == 1) {
+        const Py_UCS4 ch = PyUnicode_READ_CHAR(argument, 0);
+        if (ch < 128) {
+            const char c = ch;
+            if (ch == '+' || ch == '-') {
+                *((char*)pointer) = c;
+                return 1;
+            }
+        }
+    }
+error:
+    PyErr_SetString(PyExc_ValueError, "strand must be '+' or '-'");
+    return 0;
+}
+
 static const char Aligner_score__doc__[] = "calculates the alignment score";
 
 static PyObject*
@@ -6562,16 +6715,18 @@ Aligner_score(Aligner* self, PyObject* args, PyObject* keywords)
     Py_buffer bB = {0};
     const Mode mode = self->mode;
     const Algorithm algorithm = _get_algorithm(self);
+    char strand = '+';
     PyObject* result = NULL;
     PyObject* substitution_matrix = self->substitution_matrix.obj;
 
-    static char *kwlist[] = {"sequenceA", "sequenceB", NULL};
+    static char *kwlist[] = {"sequenceA", "sequenceB", "strand", NULL};
 
     bA.obj = (PyObject*)self;
     bB.obj = (PyObject*)self;
-    if(!PyArg_ParseTupleAndKeywords(args, keywords, "O&O&", kwlist,
+    if(!PyArg_ParseTupleAndKeywords(args, keywords, "O&O&O&", kwlist,
                                     sequence_converter, &bA,
-                                    sequence_converter, &bB))
+                                    sequence_converter, &bB,
+                                    strand_converter, &strand))
         return NULL;
 
     sA = bA.buf;
@@ -6584,9 +6739,9 @@ Aligner_score(Aligner* self, PyObject* args, PyObject* keywords)
             switch (mode) {
                 case Global:
                     if (substitution_matrix)
-                        result = Aligner_needlemanwunsch_score_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_needlemanwunsch_score_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_needlemanwunsch_score_compare(self, sA, nA, sB, nB);
+                        result = Aligner_needlemanwunsch_score_compare(self, sA, nA, sB, nB, strand);
                     break;
                 case Local:
                     if (substitution_matrix)
@@ -6600,9 +6755,9 @@ Aligner_score(Aligner* self, PyObject* args, PyObject* keywords)
             switch (mode) {
                 case Global:
                     if (substitution_matrix)
-                        result = Aligner_gotoh_global_score_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_gotoh_global_score_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_gotoh_global_score_compare(self, sA, nA, sB, nB);
+                        result = Aligner_gotoh_global_score_compare(self, sA, nA, sB, nB, strand);
                     break;
                 case Local:
                     if (substitution_matrix)
@@ -6616,15 +6771,15 @@ Aligner_score(Aligner* self, PyObject* args, PyObject* keywords)
             switch (mode) {
                 case Global:
                     if (substitution_matrix)
-                        result = Aligner_watermansmithbeyer_global_score_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_global_score_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_watermansmithbeyer_global_score_compare(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_global_score_compare(self, sA, nA, sB, nB, strand);
                     break;
                 case Local:
                     if (substitution_matrix)
-                        result = Aligner_watermansmithbeyer_local_score_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_local_score_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_watermansmithbeyer_local_score_compare(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_local_score_compare(self, sA, nA, sB, nB, strand);
                     break;
             }
             break;
@@ -6653,16 +6808,18 @@ Aligner_align(Aligner* self, PyObject* args, PyObject* keywords)
     Py_buffer bB = {0};
     const Mode mode = self->mode;
     const Algorithm algorithm = _get_algorithm(self);
+    char strand = '+';
     PyObject* result = NULL;
     PyObject* substitution_matrix = self->substitution_matrix.obj;
 
-    static char *kwlist[] = {"sequenceA", "sequenceB", NULL};
+    static char *kwlist[] = {"sequenceA", "sequenceB", "strand", NULL};
 
     bA.obj = (PyObject*)self;
     bB.obj = (PyObject*)self;
-    if(!PyArg_ParseTupleAndKeywords(args, keywords, "O&O&", kwlist,
+    if(!PyArg_ParseTupleAndKeywords(args, keywords, "O&O&O&", kwlist,
                                     sequence_converter, &bA,
-                                    sequence_converter, &bB))
+                                    sequence_converter, &bB,
+                                    strand_converter, &strand))
         return NULL;
 
     sA = bA.buf;
@@ -6675,15 +6832,15 @@ Aligner_align(Aligner* self, PyObject* args, PyObject* keywords)
             switch (mode) {
                 case Global:
                     if (substitution_matrix)
-                        result = Aligner_needlemanwunsch_align_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_needlemanwunsch_align_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_needlemanwunsch_align_compare(self, sA, nA, sB, nB);
+                        result = Aligner_needlemanwunsch_align_compare(self, sA, nA, sB, nB, strand);
                     break;
                 case Local:
                     if (substitution_matrix)
-                        result = Aligner_smithwaterman_align_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_smithwaterman_align_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_smithwaterman_align_compare(self, sA, nA, sB, nB);
+                        result = Aligner_smithwaterman_align_compare(self, sA, nA, sB, nB, strand);
                     break;
             }
             break;
@@ -6691,15 +6848,15 @@ Aligner_align(Aligner* self, PyObject* args, PyObject* keywords)
             switch (mode) {
                 case Global:
                     if (substitution_matrix)
-                        result = Aligner_gotoh_global_align_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_gotoh_global_align_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_gotoh_global_align_compare(self, sA, nA, sB, nB);
+                        result = Aligner_gotoh_global_align_compare(self, sA, nA, sB, nB, strand);
                     break;
                 case Local:
                     if (substitution_matrix)
-                        result = Aligner_gotoh_local_align_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_gotoh_local_align_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_gotoh_local_align_compare(self, sA, nA, sB, nB);
+                        result = Aligner_gotoh_local_align_compare(self, sA, nA, sB, nB, strand);
                     break;
             }
             break;
@@ -6707,15 +6864,15 @@ Aligner_align(Aligner* self, PyObject* args, PyObject* keywords)
             switch (mode) {
                 case Global:
                     if (substitution_matrix)
-                        result = Aligner_watermansmithbeyer_global_align_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_global_align_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_watermansmithbeyer_global_align_compare(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_global_align_compare(self, sA, nA, sB, nB, strand);
                     break;
                 case Local:
                     if (substitution_matrix)
-                        result = Aligner_watermansmithbeyer_local_align_matrix(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_local_align_matrix(self, sA, nA, sB, nB, strand);
                     else
-                        result = Aligner_watermansmithbeyer_local_align_compare(self, sA, nA, sB, nB);
+                        result = Aligner_watermansmithbeyer_local_align_compare(self, sA, nA, sB, nB, strand);
                     break;
             }
             break;

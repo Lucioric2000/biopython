@@ -474,7 +474,7 @@ class TreeMixin:
             instances in the tree, and values are the distance from the root to
             each clade (including terminals).
 
-        """
+        """  # noqa: D402
         if unit_branch_lengths:
             depth_of = lambda c: 1  # noqa: E731
         else:
@@ -974,18 +974,22 @@ class Tree(TreeElement, TreeMixin):
             # Follow python convention and default to using __str__
             return str(self)
 
-    def format(self, format):
+    def format(self, fmt=None, format=None):
         """Serialize the tree as a string in the specified file format.
 
-        This duplicates the __format__ magic method for pre-2.6 Pythons.
+        :param fmt: a lower-case string supported by ``Bio.Phylo.write``
+            as an output file format.
+
         """
-        warnings.warn(
-            "Tree.format has been deprecated, and we intend to remove it in "
-            "a future release of Biopython. Instead of tree.format(format), "
-            "please use format(tree, format_spec) or an f-string.",
-            BiopythonDeprecationWarning,
-        )
-        return self.__format__(format)
+        if format is not None:
+            if fmt is not None:
+                raise ValueError("The ``format`` argument has been renamed to ``fmt``.")
+            warnings.warn(
+                "The ``format`` argument has been renamed to ``fmt``.",
+                BiopythonDeprecationWarning,
+            )
+            fmt = format
+        return self.__format__(fmt)
 
     # Pretty-printer for the entire tree hierarchy
 
