@@ -45,7 +45,23 @@ class TestUniprot(SeqRecordTestBaseClass):
         self.assertEqual(len(seq_record.features), 1)
         self.assertEqual(
             repr(seq_record.features[0]),
-            "SeqFeature(FeatureLocation(ExactPosition(0), ExactPosition(116)), type='chain', id='PRO_0000377969')",
+            "SeqFeature(FeatureLocation(ExactPosition(0), ExactPosition(116)), type='chain', id='PRO_0000377969', qualifiers=...)",
+        )
+
+        self.assertEqual(
+            str(seq_record.features[0]),
+            "\n".join(
+                [
+                    "type: chain",
+                    "location: [0:116]",
+                    "id: PRO_0000377969",
+                    "qualifiers:",
+                    "    Key: description, Value: Uncharacterized protein 043L",
+                    "    Key: id, Value: PRO_0000377969",
+                    "    Key: type, Value: chain",
+                    "",
+                ]
+            ),
         )
 
         self.assertEqual(len(seq_record.annotations["references"]), 2)
@@ -416,6 +432,28 @@ class TestUniprot(SeqRecordTestBaseClass):
             ],
         )
 
+        self.assertEqual(
+            repr(seq_record.features[1]),
+            "SeqFeature(FeatureLocation(ExactPosition(17), ExactPosition(43)), type='propeptide', id='PRO_0000009556', qualifiers=...)",
+        )
+
+        self.assertEqual(
+            str(seq_record.features[1]),
+            "\n".join(
+                [
+                    "type: propeptide",
+                    "location: [17:43]",
+                    "id: PRO_0000009556",
+                    "qualifiers:",
+                    "    Key: evidence, Value: 7",
+                    "    Key: id, Value: PRO_0000009556",
+                    "    Key: status, Value: potential",
+                    "    Key: type, Value: propeptide",
+                    "",
+                ]
+            ),
+        )
+
     def test_sp016(self):
         """Parsing SwissProt file sp016."""
         filename = "sp016"
@@ -463,7 +501,7 @@ class TestUniprot(SeqRecordTestBaseClass):
                 # TODO - Why is this a list vs str?
                 continue
             self.assertIsInstance(
-                old.annotations[key], type(new.annotations[key]), msg="key=%s" % key
+                old.annotations[key], type(new.annotations[key]), msg=f"key={key}"
             )
             if key == "references":
                 self.assertEqual(len(old.annotations[key]), len(new.annotations[key]))
@@ -490,7 +528,7 @@ class TestUniprot(SeqRecordTestBaseClass):
                 )
             else:
                 self.assertEqual(
-                    old.annotations[key], new.annotations[key], msg="key=%s" % key
+                    old.annotations[key], new.annotations[key], msg=f"key={key}"
                 )
         self.assertEqual(
             len(old.features),
@@ -509,7 +547,7 @@ class TestUniprot(SeqRecordTestBaseClass):
             self.assertEqual(
                 repr(f1.location),
                 repr(f2.location),
-                "%s %s vs %s %s" % (f1.location, f1.type, f2.location, f2.type),
+                f"{f1.location} {f1.type} vs {f2.location} {f2.type}",
             )
 
     def test_Q13639(self):

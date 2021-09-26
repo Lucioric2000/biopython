@@ -40,6 +40,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Ariel Aptekmann <https://github.com/aralap>
 - Artemi Bendandi <https://github.com/artbendandi>
 - Austin Varela <https://github.com/austinv11>
+- Aziz Khan <https://github.com/asntech>
 - Barbara Mühlemann <https://github.com/bamueh>
 - Bart de Koning <bratdaking gmail>
 - Bartek Wilczynski <bartek at domain rezolwenta.eu.org>
@@ -70,6 +71,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Chad Parmet <https://github.com/cparmet>
 - Chaitanya Gupta <https://github.com/iCHAIT>
 - Cheng Soon Ong <chengsoon.ong at tuebingen.mpg.de>
+- Chenghao Zhu <zhuchcn@gmail.com>
 - Chris Daley <https://github.com/chebizarro>
 - Chris Lasher <chris.lasher at gmail.com>
 - Chris MacRaild <https://github.com/macraild>
@@ -102,6 +104,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Eric Talevich <https://github.com/etal>
 - Erick Matsen <surname at fhcrc dot org>
 - Erik Cederstrand <https://github.com/ecederstrand>
+- Fabian Egli <https://github.com/fabianegli>
 - Fei Qi <https://github.com/qifei9>
 - Foen Peng <https://github.com/foenpeng>
 - Francesco Gastaldello <https://github.com/Gasta88>
@@ -127,6 +130,7 @@ please open an issue on GitHub or mention it on the mailing list.
 - Hye-Shik Chang <perky at domain fallin.lv>
 - Iddo Friedberg <https://github.com/idoerg>
 - Ilya Flyamer <https://github.com/Phlya>
+- Isaac Ellmen <https://github.com/Ellmen>
 - Ivan Antonov <https://github.com/vanya-antonov>
 - Jacek Śmietański <https://github.com/dadoskawina>
 - Jack Twilley <https://github.com/mathuin>
