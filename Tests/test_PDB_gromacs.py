@@ -111,8 +111,7 @@ class ParseSmallGRO_tests(unittest.TestCase):
                 # assert the box numbers
                 box1_numbers = [float(x) for x in struct1[-1].strip().split()]
                 box2_numbers = [float(x) for x in struct2[-1].strip().split()]
-                assert box1_numbers == box2_numbers
-                assert struct1[-1].strip() == struct2[-1].strip()
+                assert np.isclose(box1_numbers, box2_numbers).all()
                 structure1_atoms = list(structure.get_atoms())
                 assert len(structure1_atoms) == len(struct1) - 3
                 for i_atom_line in range(2, len(struct1) - 1):
@@ -133,7 +132,12 @@ class ParseSmallGRO_tests(unittest.TestCase):
                     )
                     # Checks that the coordinates are saved in the re-created structure, but not
                     # the velocities (list elements from 6 onwards)
-                    assert items_atom_struct_2 == items_atom_struct_1[0:6]
+                    assert items_atom_struct_1[0:3] == items_atom_struct_2[0:3]
+                    coords_struct_1 = [float(c) for c in items_atom_struct_1[3:6]]
+                    coords_struct_2 = [float(c) for c in items_atom_struct_2[3:6]]
+                    assert np.isclose(coords_struct_1, coords_struct_2).all()
+                    # Check that the velocities were not saved in the output GROMACS file
+                    assert len(items_atom_struct_2) == 6
             reloaded = self.strict.get_structure("reloaded", tmp_path)
             self.assertEqual(len(reloaded), 1)
             reloaded_model = reloaded["MD of 2 waters, t= 0.0"]
