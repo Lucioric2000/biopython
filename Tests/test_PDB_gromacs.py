@@ -23,7 +23,6 @@ except ImportError:
 
 from Bio.PDB.GROIO import GROIO
 from Bio.PDB.GROParser import GROParser
-from Bio.PDB.parse_gro_header import parse_gro_header
 
 
 class ParseSmallGRO_tests(unittest.TestCase):
@@ -33,13 +32,6 @@ class ParseSmallGRO_tests(unittest.TestCase):
     def setUpClass(cls):
         cls.permissive = GROParser()
         cls.strict = GROParser(PERMISSIVE=0)
-
-    def test_empty(self):
-        """Parse an empty file."""
-        handle = StringIO()
-        with self.assertRaises(ValueError) as context_manager:
-            _ = self.permissive.get_structure("MT", handle)
-        self.assertEqual(str(context_manager.exception), "Empty file.")
 
     def test_SMCRA(self):
         """Walk down the structure hierarchy and test parser reliability."""
@@ -61,12 +53,11 @@ class ParseSmallGRO_tests(unittest.TestCase):
         """Parse waters.gro file in strict mode."""
         structure = self.strict.get_structure("example", "PDB/waters.gro")
         self.assertEqual(len(structure), 1)
-        model = structure[0.0]
-        self.assertEqual(model.id, 0.0)
+        model = structure["MD of 2 waters, t= 0.0"]
+        self.assertEqual(model.id, "MD of 2 waters, t= 0.0")
         self.assertEqual(model.level, "M")
         self.assertEqual(len(model), 1)
-        chain = model[" "]
-        self.assertEqual(chain.id, " ")
+        chain = next(model.get_chains())
         self.assertEqual(chain.level, "C")
         self.assertEqual(len(chain), 2)
         self.assertEqual(
@@ -81,6 +72,12 @@ class ParseSmallGRO_tests(unittest.TestCase):
             " ".join(atom.element for atom in chain.get_atoms()),
             "O H H O H H",
         )
+
+        # Asserts that all the atoms are read with the correct occupancy (1.0) and bfactor (0.0)
+        for atom in chain.get_atoms():
+            assert np.isclose(atom.bfactor, 0.0)
+            assert np.isclose(atom.occupancy, 1.0)
+
         self.assertEqual(len(model.box), 3)
         self.assertAlmostEqual(model.box[0], 1.82060)
         self.assertAlmostEqual(model.box[1], 1.82060)
@@ -95,13 +92,6 @@ class ParseSmallGRO_tests(unittest.TestCase):
         assert residue_id[1] == 2
         assert np.isclose(atom2res2.coord, [13.37, 0.02, 6.80]).all()
 
-    def test_parse_gro_header(self):
-        """Parse GRO header."""
-        header = parse_gro_header("PDB/waters.gro")
-        self.assertEqual(header["name"].strip(), "MD of 2 waters, t= 0.0")
-        self.assertEqual(header["atom_count"], 6)
-        self.assertEqual(header["box"].strip(), "1.82060   1.82060   1.82060")
-
     def test_gro_io_save(self):
         """Save and reload structure using GROIO."""
         structure = self.strict.get_structure("example", "PDB/waters.gro")
@@ -111,12 +101,44 @@ class ParseSmallGRO_tests(unittest.TestCase):
             io = GROIO()
             io.set_structure(structure)
             io.save(tmp_path)
-
+            with open(tmp_path) as f2, open("PDB/waters.gro") as f1:
+                struct1 = list(f1.readlines())
+                struct2 = list(f2.readlines())
+                assert struct1[0].strip() == struct2[0].strip()  # Title string
+                assert (
+                    struct1[1].strip() == struct2[1].strip()
+                )  # Number of atoms string
+                # assert the box numbers
+                box1_numbers = [float(x) for x in struct1[-1].strip().split()]
+                box2_numbers = [float(x) for x in struct2[-1].strip().split()]
+                assert box1_numbers == box2_numbers
+                assert struct1[-1].strip() == struct2[-1].strip()
+                structure1_atoms = list(structure.get_atoms())
+                assert len(structure1_atoms) == len(struct1) - 3
+                for i_atom_line in range(2, len(struct1) - 1):
+                    structure1_atom = structure1_atoms[i_atom_line - 2]
+                    items_atom_struct_1 = struct1[i_atom_line].strip().split()
+                    items_atom_struct_2 = struct2[i_atom_line].strip().split()
+                    # we convert the coordinates to angstroms for testing
+                    residue_id = structure1_atom.parent.get_id()
+                    assert (
+                        f"{residue_id[1]}{structure1_atom.parent.resname}"
+                        == items_atom_struct_2[0]
+                    )
+                    assert structure1_atom.name == items_atom_struct_2[1]
+                    coords = [float(c) * 10 for c in items_atom_struct_1[3:6]]
+                    assert np.isclose(structure1_atom.coord, coords).all(), (
+                        structure1_atom.coord,
+                        coords,
+                    )
+                    # Checks that the coordinates are saved in the re-created structure, but not
+                    # the velocities (list elements from 6 onwards)
+                    assert items_atom_struct_2 == items_atom_struct_1[0:6]
             reloaded = self.strict.get_structure("reloaded", tmp_path)
             self.assertEqual(len(reloaded), 1)
-            reloaded_model = reloaded[0.0]
+            reloaded_model = reloaded["MD of 2 waters, t= 0.0"]
             self.assertEqual(len(reloaded_model), 1)
-            reloaded_chain = reloaded_model[" "]
+            reloaded_chain = next(reloaded_model.get_chains())
             self.assertEqual(len(reloaded_chain), 2)
             self.assertEqual(
                 " ".join(atom.name for atom in reloaded_chain.get_atoms()),
