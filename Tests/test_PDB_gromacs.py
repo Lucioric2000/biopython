@@ -7,7 +7,6 @@
 
 """Unit tests for the Bio.PDB GROParser and GROIO modules."""
 
-from io import StringIO
 import os
 import tempfile
 import unittest
@@ -93,8 +92,18 @@ class ParseSmallGRO_tests(unittest.TestCase):
         assert np.isclose(atom2res2.coord, [13.37, 0.02, 6.80]).all()
 
     def test_gro_io_save(self):
-        """Save and reload structure using GROIO."""
+        """Save and reload a structure using GROIO."""
         structure = self.strict.get_structure("example", "PDB/waters.gro")
+        atomic_data_boundaries = [
+            0,
+            5,
+            10,
+            15,
+            20,
+            28,
+            36,
+            44,
+        ]  # limits for cutting the atomic data
         with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".gro") as tmp:
             tmp_path = tmp.name
         try:
@@ -116,28 +125,34 @@ class ParseSmallGRO_tests(unittest.TestCase):
                 assert len(structure1_atoms) == len(struct1) - 3
                 for i_atom_line in range(2, len(struct1) - 1):
                     structure1_atom = structure1_atoms[i_atom_line - 2]
-                    items_atom_struct_1 = struct1[i_atom_line].strip().split()
-                    items_atom_struct_2 = struct2[i_atom_line].strip().split()
-                    # we convert the coordinates to angstroms for testing
+                    items_atom_struct_1 = [
+                        struct1[i_atom_line][x:y]
+                        for x, y in zip(
+                            atomic_data_boundaries, atomic_data_boundaries[1:]
+                        )
+                    ]
+                    items_atom_struct_2 = [
+                        struct2[i_atom_line][x:y]
+                        for x, y in zip(
+                            atomic_data_boundaries, atomic_data_boundaries[1:]
+                        )
+                    ]
                     residue_id = structure1_atom.parent.get_id()
+                    assert residue_id[1] == int(items_atom_struct_2[0])
                     assert (
-                        f"{residue_id[1]}{structure1_atom.parent.resname}"
-                        == items_atom_struct_2[0]
+                        structure1_atom.parent.resname == items_atom_struct_2[1].strip()
                     )
-                    assert structure1_atom.name == items_atom_struct_2[1]
-                    coords = [float(c) * 10 for c in items_atom_struct_1[3:6]]
-                    assert np.isclose(structure1_atom.coord, coords).all(), (
+                    assert structure1_atom.name == items_atom_struct_2[2].strip()
+                    coords_struct_1 = [float(c) * 10 for c in items_atom_struct_1[4:7]]
+                    assert np.isclose(structure1_atom.coord, coords_struct_1).all(), (
                         structure1_atom.coord,
-                        coords,
+                        coords_struct_1,
                     )
-                    # Checks that the coordinates are saved in the re-created structure, but not
-                    # the velocities (list elements from 6 onwards)
-                    assert items_atom_struct_1[0:3] == items_atom_struct_2[0:3]
-                    coords_struct_1 = [float(c) for c in items_atom_struct_1[3:6]]
-                    coords_struct_2 = [float(c) for c in items_atom_struct_2[3:6]]
+                    # Checks that the coordinates are saved in the re-created structure
+                    coords_struct_2 = [float(c) * 10 for c in items_atom_struct_2[4:7]]
                     assert np.isclose(coords_struct_1, coords_struct_2).all()
                     # Check that the velocities were not saved in the output GROMACS file
-                    assert len(items_atom_struct_2) == 6
+                    assert len(struct2[i_atom_line].rstrip()) <= 44
             reloaded = self.strict.get_structure("reloaded", tmp_path)
             self.assertEqual(len(reloaded), 1)
             reloaded_model = reloaded["MD of 2 waters, t= 0.0"]
@@ -156,6 +171,90 @@ class ParseSmallGRO_tests(unittest.TestCase):
             residue_id = atom2res2.parent.get_id()
             assert residue_id[1] == 2
             assert np.isclose(atom2res2.coord, [13.37, 0.02, 6.80]).all()
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_gro_io_save_big_box(self):
+        """Save and reload a structure with a big box (no spaces between coordinates) using GROIO."""
+        structure = self.strict.get_structure("example", "PDB/waters_big_box.gro")
+        atomic_data_boundaries = [
+            0,
+            5,
+            10,
+            15,
+            20,
+            28,
+            36,
+            44,
+        ]  # limits for cutting the atomic data
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".gro") as tmp:
+            tmp_path = tmp.name
+        try:
+            io = GROIO()
+            io.set_structure(structure)
+            io.save(tmp_path)
+            with open(tmp_path) as f2, open("PDB/waters_big_box.gro") as f1:
+                struct1 = list(f1.readlines())
+                struct2 = list(f2.readlines())
+                assert struct1[0].strip() == struct2[0].strip()  # Title string
+                assert (
+                    struct1[1].strip() == struct2[1].strip()
+                )  # Number of atoms string
+                # assert the box numbers
+                box1_numbers = [float(x) for x in struct1[-1].strip().split()]
+                box2_numbers = [float(x) for x in struct2[-1].strip().split()]
+                assert np.isclose(box1_numbers, box2_numbers).all()
+                structure1_atoms = list(structure.get_atoms())
+                assert len(structure1_atoms) == len(struct1) - 3
+                for i_atom_line in range(2, len(struct1) - 1):
+                    structure1_atom = structure1_atoms[i_atom_line - 2]
+                    items_atom_struct_1 = [
+                        struct1[i_atom_line][x:y]
+                        for x, y in zip(
+                            atomic_data_boundaries, atomic_data_boundaries[1:]
+                        )
+                    ]
+                    items_atom_struct_2 = [
+                        struct2[i_atom_line][x:y]
+                        for x, y in zip(
+                            atomic_data_boundaries, atomic_data_boundaries[1:]
+                        )
+                    ]
+                    residue_id = structure1_atom.parent.get_id()
+                    assert residue_id[1] == int(items_atom_struct_2[0])
+                    assert (
+                        structure1_atom.parent.resname == items_atom_struct_2[1].strip()
+                    )
+                    assert structure1_atom.name == items_atom_struct_2[2].strip()
+                    coords_struct_1 = [float(c) * 10 for c in items_atom_struct_1[4:7]]
+                    assert np.isclose(structure1_atom.coord, coords_struct_1).all(), (
+                        structure1_atom.coord,
+                        coords_struct_1,
+                    )
+                    # Checks that the coordinates are saved in the re-created structure
+                    coords_struct_2 = [float(c) * 10 for c in items_atom_struct_2[4:7]]
+                    assert np.isclose(coords_struct_1, coords_struct_2).all()
+                    # Check that the velocities were not saved in the output GROMACS file
+                    assert len(struct2[i_atom_line].rstrip()) <= 44
+            reloaded = self.strict.get_structure("reloaded", tmp_path)
+            self.assertEqual(len(reloaded), 1)
+            reloaded_model = reloaded["MD of 2 waters, t= 0.0"]
+            self.assertEqual(len(reloaded_model), 1)
+            reloaded_chain = next(reloaded_model.get_chains())
+            self.assertEqual(len(reloaded_chain), 2)
+            self.assertEqual(
+                " ".join(atom.name for atom in reloaded_chain.get_atoms()),
+                "OW1 HW2 HW3 OW1 HW2 HW3",
+            )
+            # Tests the chain residue 2, atom 2
+            residue2 = list(reloaded_chain.get_residues())[1]
+            atom2res2 = list(residue2.get_atoms())[1]
+            assert atom2res2.name == "HW2"
+            assert atom2res2.parent.resname == "WATER"
+            residue_id = atom2res2.parent.get_id()
+            assert residue_id[1] == 2
+            assert np.isclose(atom2res2.coord, [16213.37, 16200.02, 16206.80]).all()
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
