@@ -166,23 +166,8 @@ class GROParser:
             structure_builder.set_line_counter(global_line_counter)
             if model_open in (0, 5):
                 # Initialize the Model - there was no explicit MODEL record
-                m = re.match(r"(.*?)(,? t= *(.*) *)", line)
-                try:
-                    header = m.group(1)
-                    timeid = m.group(3)
-                    try:
-                        timeid = int(timeid)
-                    except ValueError:
-                        try:
-                            timeid = float(timeid)
-                        except ValueError:
-                            pass
-                    current_model_id = timeid
-                except Exception:
-                    header = line
-                    current_model_id = line
+                current_model_id = line
                 structure_builder.init_model(current_model_id)
-                structure_builder.model.header = header
                 model_open = 1
                 thismodel_atoms_line_counter = 0
             elif model_open == 1:

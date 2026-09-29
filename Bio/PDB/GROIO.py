@@ -158,8 +158,8 @@ class GROIO:
         for i_model, model in enumerate(struct_get_list):
             if not select.accept_model(model):
                 continue
-            fp.write(self.structure.id + ", t=   " + str(model.id) + "\n")
-            fp.write(str(atoms_count[model.id]) + "\n")
+            fp.write(f"{model.id}\n")
+            fp.write(f"    {atoms_count[model.id]}\n")
             model_residues_written = 0
             for chain in model.get_list():
                 if not select.accept_chain(chain):
