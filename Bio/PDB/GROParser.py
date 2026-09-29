@@ -233,8 +233,8 @@ class GROParser:
                     ) from None
                 coord = numpy.array((x, y, z), "f")
                 # occupancy & B factor (absent in GRO files!)
-                occupancy = 0.0
-                bfactor = 1.0
+                occupancy = 1.0
+                bfactor = 0.0
 
                 element = ElementGuesser(name, resname)
                 segid = ""
